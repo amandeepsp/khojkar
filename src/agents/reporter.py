@@ -11,17 +11,14 @@ class Reporter:
         self,
         model: str,
         topic: str,
-        scraped_content: list[str],
         report_template: str = DEFAULT_REPORT_TEMPLATE,
     ):
         self.model = model
         self.topic = topic
         self.report_template = report_template
-        self.scraped_content = scraped_content
         logger.info(f"Initialized Reporter for topic: {topic} using model: {model}")
-        logger.debug(f"Received {len(scraped_content)} scraped content items")
 
-    def _generate_report_prompt(self) -> str:
+    def _generate_report_prompt(self, scraped_content: list[str]) -> str:
         """Generate the prompt for the report"""
         logger.debug("Generating report prompt")
         return f"""
@@ -39,14 +36,14 @@ class Reporter:
         </Report Template>
 
         <Scraped Content>
-        {'\n\n'.join([content for content in self.scraped_content if content])}
+        {'\n\n'.join([content for content in scraped_content if content])}
         </Scraped Content>
         """.strip()
     
-    def generate_report(self) -> str:
+    def generate_report(self, scraped_content: list[str]) -> str:
         """Generate the report"""
-        logger.info(f"Generating report for topic: {self.topic}")
-        prompt = self._generate_report_prompt()
+        logger.info(f"Generating report for topic: {self.topic} using {len(scraped_content)} content items")
+        prompt = self._generate_report_prompt(scraped_content)
         
         response = litellm.completion(
             model=self.model,

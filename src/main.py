@@ -3,12 +3,8 @@ import asyncio
 import click
 import logging
 from typing import Optional
-from pathlib import Path
 
-from agents.planner import QueryPlanner, ScrapePlanner
-from agents.reporter import Reporter
-from search.google import GoogleProgrammableSearchEngine
-from search.scrape import Scraper
+from agents.orchestrator import ResearchOrchestrator
 
 from logger import configure_global_logging
 
@@ -47,75 +43,45 @@ def cli():
 )
 def research(topic: str, model: str, queries: int, output: Optional[str]):
     """Research a topic and generate a markdown report"""
-    logger.info(f"Starting research on topic: '{topic}' using model: {model}")
-    click.echo(f"Researching topic: {topic}")
+    logger.info(f"CLI invoked for research on topic: '{topic}' using model: {model}")
+    click.echo(f"Starting research for topic: {topic}")
     click.echo(f"Using model: {model}")
     
-    # Generate search queries
-    logger.info("Starting query generation phase")
-    click.echo("Generating search queries...")
-    query_planner = QueryPlanner(model=model, topic=topic, number_of_queries=queries)
-    search_queries = query_planner.generate_queries()
+    # Initialize the orchestrator
+    orchestrator = ResearchOrchestrator(
+        topic=topic,
+        model=model,
+        num_queries=queries,
+        output_path=output
+    )
     
-    # Search for each query
-    logger.info(f"Starting search phase with {len(search_queries)} queries")
-    click.echo("Searching the web...")
-    search_engine = GoogleProgrammableSearchEngine()
-    
-    async def run_searches():
-        logger.info(f"Executing {len(search_queries)} parallel search tasks")
-        tasks = [search_engine.search_and_stitch_context(query) for query in search_queries]
-        return await asyncio.gather(*tasks)
-    
-    search_results = asyncio.run(run_searches())
-    mapped_search_results = {query: result for query, result in zip(search_queries, search_results)}
-    logger.info(f"Completed search phase, received results for {len(mapped_search_results)} queries")
-    
-    # Analyze and select the best sources
-    logger.info("Starting source analysis phase")
-    click.echo("Analyzing search results...")
-    scrape_planner = ScrapePlanner(model=model, topic=topic, search_results=mapped_search_results)
-    selected_sources = scrape_planner.analyze_and_select_sources()
-    
-    # Scrape the selected sources
-    logger.info(f"Starting scraping phase for {len(selected_sources)} sources")
-    click.echo("Scraping selected sources...")
-    scraper = Scraper(concurrency=5)
-    urls = [entry["url"] for entry in selected_sources]
-    
-    async def run_scraping():
-        logger.info(f"Executing scraping for {len(urls)} URLs")
-        return await scraper.scrape_urls(urls)
-    
-    scrape_results = asyncio.run(run_scraping())
-    
-    # Count non-empty results
-    non_empty_results = sum(1 for content in scrape_results if content)
-    logger.info(f"Completed scraping phase, {non_empty_results}/{len(scrape_results)} sources yielded content")
-    
-    # Generate the report
-    logger.info("Starting report generation phase")
-    click.echo("Generating report...")
-    reporter = Reporter(model=model, topic=topic, scraped_content=scrape_results)
-    report = reporter.generate_report()
-    
-    # Save the report
-    if output is None:
-        output = f"{topic.replace(' ', '_')}.md"
-    
-    output_path = Path(output)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    
-    with open(output_path, "w") as f:
-        f.write(report)
-    
-    logger.info(f"Report saved to {output_path.absolute()}")
-    click.echo(f"Report saved to {output_path}")
+    # Run the research process via the orchestrator
+    try:
+        # Use asyncio.run() to execute the async method
+        report_path = asyncio.run(orchestrator.execute_research())
+        
+        if report_path:
+             click.echo(f"Research complete. Report saved to: {report_path}")
+        else:
+             click.echo("Research process did not complete successfully or was aborted.")
+             
+    except Exception as e:
+        # The orchestrator logs the exception details, here we just inform the user via CLI
+        logger.error(f"Research failed with an unhandled exception in orchestrator: {e}") 
+        click.echo(f"An error occurred during the research: {e}", err=True)
+        # Optionally re-raise or exit with an error code
+        # raise # Or import sys; sys.exit(1)
 
 
 if __name__ == "__main__":
+    # The try-except block here can catch exceptions from cli() setup itself,
+    # or exceptions deliberately re-raised from the research command.
     try:
         cli()
     except Exception as e:
-        logger.exception(f"Unhandled error during research: {e}")
-        raise
+        logger.exception(f"Unhandled error at top level: {e}")
+        # Optionally provide a user-friendly message here as well
+        # click.echo(f"A critical error occurred: {e}", err=True)
+        # Consider exiting with a non-zero status code
+        # import sys
+        # sys.exit(1) 

@@ -85,16 +85,15 @@ class ScrapePlanner:
             self,
             model: str,
             topic: str,
-            search_results: dict[str, str],
+            number_of_sources: int = 10
         ) -> None:
 
         self.model = model
-        self.search_results = search_results
         self.topic = topic
+        self.number_of_sources = number_of_sources
         logger.info(f"Initialized ScrapePlanner for topic: {topic} using model: {model}")
-        logger.debug(f"Received {len(search_results)} search result sets")
     
-    def _generate_analysis_prompt(self):
+    def _generate_analysis_prompt(self, search_results: dict[str, str]):
         """Generate prompt for LLM to analyze search results.
         
         Args:
@@ -113,7 +112,7 @@ class ScrapePlanner:
         I've performed searches for the following queries and received these results:        
         """
 
-        for query, result in self.search_results.items():
+        for query, result in search_results.items():
             prompt += f"Query: {query}\n"
             prompt += f"{result}\n\n"
         
@@ -127,6 +126,7 @@ class ScrapePlanner:
         4. Provide comprehensive information
         
         For each selected source, explain briefly why it's valuable for the research.
+        Select at least {self.number_of_sources} sources.
         </Task>
         
         <Format>
@@ -143,15 +143,18 @@ class ScrapePlanner:
         """
         return prompt
     
-    def analyze_and_select_sources(self):
+    def analyze_and_select_sources(self, search_results: dict[str, str]):
         """Search for all queries and then analyze results to pick the best sources.
         
+        Args:
+            search_results: Dict mapping queries to their search results
+            
         Returns:
             List of selected sources with explanations
         """
-        logger.info(f"Analyzing search results for topic: {self.topic}")
+        logger.info(f"Analyzing {len(search_results)} search result sets for topic: {self.topic}")
         
-        prompt = self._generate_analysis_prompt()
+        prompt = self._generate_analysis_prompt(search_results)
         
         # Ask LLM to analyze and select the most promising sources
         response = litellm.completion(
