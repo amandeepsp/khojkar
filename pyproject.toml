@@ -1,0 +1,41 @@
+[project]
+name = "khojkar"
+version = "0.1.0"
+description = "A tool for conducting deep research on a given topic, using a combination of LLMs, search engines, and other tools."
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "python-dotenv>=1.1.0",
+    "click>=8.1.8",
+    "litellm>=1.65.4.post1",
+    "pydantic>=2.11.2",
+    "requests>=2.32.3",
+    "pypdf>=5.4.0",
+    "trafilatura>=2.0.0",
+]
+
+[dependency-groups]
+dev = [
+    "ipykernel>=6.29.5",
+    "jupyter>=1.1.1",
+    "mypy>=1.15.0",
+    "notebook>=7.3.3",
+    "ruff>=0.11.4",
+]
+
+[project.scripts]
+khojkar = "main:cli"
+
+[tool.ruff]
+target-version = "py313"
+line-length = 88
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+
+[tool.mypy]
+python_version = "3.13"
