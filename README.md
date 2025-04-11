@@ -1,3 +1,3 @@
 # khojkar
 
-khojkar (pa: ਖੋਜਕਾਰ) is a deep research agent.
+khojkar (pa: ਖੋਜਕਾਰ, ipa: /kʰoːd͡ʒ.kɑːɾ/) is a deep research agent.
