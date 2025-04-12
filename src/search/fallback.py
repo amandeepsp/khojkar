@@ -27,6 +27,7 @@ class FallbackSearchEngine(SearchEngine):
             "too many requests",
             429,
         ],
+        fallback_threshold: int = 3,
     ) -> None:
         """Initialize the fallback search engine.
 
@@ -35,6 +36,7 @@ class FallbackSearchEngine(SearchEngine):
             fallback_engine: The fallback search engine to use if primary fails
             error_conditions: List of error conditions (status codes, exception types,
                               or error messages) that trigger the fallback
+            fallback_threshold: Number of consecutive fallbacks before swapping engines
 
         """
         self.primary = primary_engine
@@ -47,10 +49,18 @@ class FallbackSearchEngine(SearchEngine):
             "quota",
             "limit",
         ]
+        self.fallback_count = 0
+        self.fallback_threshold = fallback_threshold
 
         logger.info(
-            f"Initialized FallbackSearchEngine with error_conditions={self.error_conditions}"
+            f"Initialized FallbackSearchEngine with error_conditions={self.error_conditions}, fallback_threshold={fallback_threshold}"
         )
+
+    def _swap_engines(self) -> None:
+        """Swap the primary and fallback engines."""
+        logger.info("Swapping primary and fallback engines due to frequent fallbacks")
+        self.primary, self.fallback = self.fallback, self.primary
+        self.fallback_count = 0
 
     @override
     async def _search(self, query: str) -> SearchResults:
@@ -67,6 +77,8 @@ class FallbackSearchEngine(SearchEngine):
             logger.info(f"Attempting search with primary engine for query: {query}")
             results = await self.primary._search(query)
             logger.info(f"Primary search succeeded with {len(results.results)} results")
+            # Reset fallback count on successful primary search
+            self.fallback_count = 0
             return results
         except Exception as e:
             error_str = str(e).lower()
@@ -93,6 +105,13 @@ class FallbackSearchEngine(SearchEngine):
                 logger.warning(
                     f"Primary search failed with recognized error condition: {str(e)}. Using fallback engine."
                 )
+                self.fallback_count += 1
+                logger.info(f"Fallback count increased to {self.fallback_count}")
+
+                # Check if we should swap engines
+                if self.fallback_count >= self.fallback_threshold:
+                    self._swap_engines()
+
                 return await self.fallback._search(query)
             else:
                 logger.error(

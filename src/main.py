@@ -11,11 +11,11 @@ import utils
 from agents.deep_research import DeepResearchAgent
 from core.tool import Tool, ToolRegistry
 from prompts import deep_research_prompt
+from scraping.trafilatura_scaper import TrafilaturaScraper
 from search.arxiv import ArxivSearchEngine
 from search.cse_scraper import GoogleProgrammableScrapingSearchEngine
 from search.fallback import FallbackSearchEngine
 from search.google import GoogleProgrammableSearchEngine
-from search.scrape import Scraper
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -83,7 +83,7 @@ async def execute_research(
 
     arxiv_search = ArxivSearchEngine(num_results=10)
 
-    scraper = Scraper()
+    scraper = TrafilaturaScraper()
 
     google_search_tool = Tool(
         name="google_search",

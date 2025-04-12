@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import override
+from typing import Callable, override
 
 import litellm
 
@@ -19,12 +19,14 @@ class ReActAgent(Agent[litellm.Message]):
         prompt: str,
         tool_registry: ToolRegistry,
         max_steps: int = 10,
+        default_temperature: float = 0.3,
     ):
         super().__init__(name, model, tool_registry, next_agents=[])
         self.max_steps = max_steps
         self.prompt = prompt
         self.messages = InContextMemory(system_prompt=prompt, max_tokens=1_000_000_000)
         self.current_step = 0
+        self.default_temperature = default_temperature
 
     @override
     async def run(self) -> litellm.Message:
@@ -39,8 +41,10 @@ class ReActAgent(Agent[litellm.Message]):
                 messages=self.messages.get(),
                 tools=self.tool_registry.tool_schemas(),
                 tool_choice="auto",
-                temperature=0.0,
+                temperature=self.default_temperature,
             )
+
+            logger.info(f"Thinking...\n\n{response.choices[0].message.content}")  # type: ignore
 
             self.messages.add(response.choices[0].message)  # type: ignore
 
