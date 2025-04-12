@@ -1,19 +1,20 @@
 [project]
 name = "khojkar"
-version = "0.2.0"
+version = "0.2.1"
 description = "A tool for conducting deep research on a given topic, using a combination of LLMs, search engines, and other tools."
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "python-dotenv>=1.1.0",
     "click>=8.1.8",
-    "litellm>=1.65.4.post1",
+    "litellm>=1.65.4",
     "pydantic>=2.11.2",
     "requests>=2.32.3",
     "pypdf>=5.4.0",
     "trafilatura>=2.0.0",
     "docstring-parser>=0.16",
     "playwright>=1.51.0",
+    "arxiv>=2.2.0",
 ]
 
 [dependency-groups]

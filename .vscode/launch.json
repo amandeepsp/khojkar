@@ -1,0 +1,28 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python Debugger: CLI",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/main.py",
+            "args": [
+                "research",
+                "--topic",
+                "${input:researchTopic}",
+                "--output",
+                "${workspaceFolder}/output.md",
+                "--max-steps",
+                "30"
+            ]
+        }
+    ],
+    "inputs": [
+        {
+            "id": "researchTopic",
+            "type": "promptString",
+            "description": "Research topic to investigate",
+            "default": "How does Deepseek R1 team train the model on so little compute?"
+        }
+    ]
+}

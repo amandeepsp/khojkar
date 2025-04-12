@@ -1,6 +1,6 @@
 import asyncio
-from io import BytesIO
 import logging
+from io import BytesIO
 
 import requests
 from pypdf import PdfReader
@@ -84,7 +84,9 @@ class Scraper:
         content_type = response.headers.get("Content-Type", "")
 
         if "text/html" in content_type:
+            # Use more aggressive options to extract content even when main content isn't easily detected
             content = extract(response.text)
+
             if content:
                 logger.info(
                     f"Successfully extracted HTML content from {url}, size: {len(content)} chars"

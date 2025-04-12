@@ -38,7 +38,7 @@ class GoogleProgrammableSearchEngine(SearchEngine):
             logger.info(f"Filtering search results to site: {link_site}")
 
     @override
-    async def search(self, query: str) -> SearchResults:
+    async def _search(self, query: str) -> SearchResults:
         """Search using Google Programmable Search API and return relevant links.
 
         Args:

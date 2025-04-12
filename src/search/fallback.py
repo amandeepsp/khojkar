@@ -53,7 +53,7 @@ class FallbackSearchEngine(SearchEngine):
         )
 
     @override
-    async def search(self, query: str) -> SearchResults:
+    async def _search(self, query: str) -> SearchResults:
         """Try primary search engine, fall back to secondary if needed.
 
         Args:
@@ -65,7 +65,7 @@ class FallbackSearchEngine(SearchEngine):
         """
         try:
             logger.info(f"Attempting search with primary engine for query: {query}")
-            results = await self.primary.search(query)
+            results = await self.primary._search(query)
             logger.info(f"Primary search succeeded with {len(results.results)} results")
             return results
         except Exception as e:
@@ -93,7 +93,7 @@ class FallbackSearchEngine(SearchEngine):
                 logger.warning(
                     f"Primary search failed with recognized error condition: {str(e)}. Using fallback engine."
                 )
-                return await self.fallback.search(query)
+                return await self.fallback._search(query)
             else:
                 logger.error(
                     f"Primary search failed with unrecognized error: {str(e)}. Error does not match fallback conditions."

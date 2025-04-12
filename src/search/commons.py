@@ -18,7 +18,7 @@ class SearchEngine(ABC):
         pass
 
     @abstractmethod
-    async def search(self, query: str) -> SearchResults:
+    async def _search(self, query: str) -> SearchResults:
         """Search using the engine and return results."""
         pass
 
@@ -28,5 +28,5 @@ class SearchEngine(ABC):
         Args:
             query: The search query
         """
-        search_results = await self.search(query)
+        search_results = await self._search(query)
         return search_results.model_dump_json()

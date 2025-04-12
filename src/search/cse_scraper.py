@@ -303,7 +303,7 @@ class GoogleProgrammableScrapingSearchEngine(SearchEngine):
             return []
 
     @override
-    async def search(self, query: str) -> SearchResults:
+    async def _search(self, query: str) -> SearchResults:
         """Search using Google Programmable Search Engine scraping and return relevant links.
 
         Args:
