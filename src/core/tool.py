@@ -1,15 +1,40 @@
 import inspect
 import logging
-from typing import Any, Callable
+from typing import Any, Callable, Protocol
 
 import docstring_parser
 
 logger = logging.getLogger(__name__)
 
 
+class ToolProtocol(Protocol):
+    @property
+    def name(self) -> str: ...
+
+    @property
+    def func(self) -> Callable[..., Any]: ...
+
+    @property
+    def schema(self) -> dict: ...
+
+    @property
+    def max_result_length(self) -> int | None: ...
+
+    @property
+    def description(self) -> str | None: ...
+
+    def formatted_signature(self) -> str: ...
+
+    async def __call__(self, **kwargs: Any) -> Any: ...
+
+
 class Tool:
     def __init__(
-        self, name: str, func: Callable, max_result_length: int | None = None
+        self,
+        name: str,
+        func: Callable,
+        max_result_length: int | None = None,
+        description: str | None = None,
     ) -> None:
         if not inspect.iscoroutinefunction(func):
             raise ValueError(
@@ -17,8 +42,9 @@ class Tool:
             )
         self.name = name
         self.func = func
-        self._schema = self._generate_schema()
         self.max_result_length = max_result_length
+        self.description = description
+        self.schema = self._generate_schema()
 
     def _generate_schema(self) -> dict:
         """
@@ -64,11 +90,18 @@ class Tool:
                     f"Unknown type annotation {param.annotation} for parameter {param.name}: {str(e)}"
                 )
 
-            parameter_description = next(
-                p.description
-                for p in parameters_descriptions
-                if p.arg_name == param.name
-            )
+            parameter_description = ""
+            try:
+                parameter_description = next(
+                    p.description
+                    for p in parameters_descriptions
+                    if p.arg_name == param.name
+                )
+            except StopIteration:
+                logger.warning(
+                    f"Missing docstring description for parameter {param.name} in tool {self.name}"
+                )
+
             parameters[param.name] = {
                 "type": param_type,
                 "description": parameter_description,
@@ -80,13 +113,15 @@ class Tool:
             if param.default == inspect._empty
         ]
 
-        description = parsed_docstring.short_description
+        docstring_description = parsed_docstring.short_description
+
+        final_description = self.description or docstring_description or ""
 
         return {
             "type": "function",
             "function": {
                 "name": self.name,
-                "description": description or "",
+                "description": final_description,
                 "parameters": {
                     "type": "object",
                     "properties": parameters,
@@ -95,14 +130,11 @@ class Tool:
             },
         }
 
-    @property
-    def schema(self) -> dict:
-        return self._schema
-
     def formatted_signature(self):
         params = self.schema["function"]["parameters"]["properties"]
         params_str = ", ".join(
-            f"{k}: {v['description'] or v['type']}" for k, v in params.items()
+            f"{k}: {v.get('description') or v.get('type', 'unknown')}"
+            for k, v in params.items()
         )
         return f"{self.name}(" + params_str + ")"
 
@@ -112,9 +144,9 @@ class Tool:
 
 class ToolRegistry:
     def __init__(self) -> None:
-        self.tools = {}
+        self.tools: dict[str, ToolProtocol] = {}
 
-    def register(self, tool: Tool) -> None:
+    def register(self, tool: ToolProtocol) -> None:
         self.tools[tool.name] = tool
 
     def tool_schemas(self) -> list[dict]:
@@ -125,8 +157,8 @@ class ToolRegistry:
             f"- `{tool.formatted_signature()}`" for tool in self.tools.values()
         )
 
-    def get(self, name: str) -> Tool:
+    def get(self, name: str) -> ToolProtocol:
         return self.tools[name]
 
-    def __getitem__(self, key: str) -> Tool:
+    def __getitem__(self, key: str) -> ToolProtocol:
         return self.tools[key]

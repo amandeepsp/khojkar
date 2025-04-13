@@ -1,13 +1,17 @@
+import logging
 from typing import override
+
 import arxiv
 
 from search.commons import SearchEngine
 from search.models import SearchResult, SearchResults
 
+logger = logging.getLogger(__name__)
+
 
 class ArxivSearchEngine(SearchEngine):
     def __init__(self, num_results: int = 10):
-        self.client = arxiv.Client()
+        self.client = arxiv.Client(page_size=num_results, delay_seconds=5)
         self.num_results = num_results
 
     @override
@@ -21,10 +25,14 @@ class ArxivSearchEngine(SearchEngine):
 
         search_results = []
         for result in results:
+            if result.pdf_url is None:
+                logger.warning(f"No PDF URL found for result: {result.title}")
+                continue
+
             search_results.append(
                 SearchResult(
                     title=result.title,
-                    url=f"https://arxiv.org/html/{result.entry_id}",
+                    url=result.pdf_url,
                     description=result.summary,
                 )
             )

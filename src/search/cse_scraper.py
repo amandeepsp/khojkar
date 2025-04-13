@@ -1,10 +1,9 @@
 """Google Custom Search Engine scraper implementation."""
 
-import asyncio
 import logging
 import os
-import random
 from contextlib import asynccontextmanager
+from datetime import datetime
 from typing import override
 
 from playwright.async_api import (
@@ -20,28 +19,11 @@ from search.models import SearchResult, SearchResults
 
 logger = logging.getLogger(__name__)
 
-# Common user agents to rotate through
-USER_AGENTS = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/117.0",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36",
-]
+# Standard user agent to use
+USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36"
 
-# Common screen resolutions
-VIEWPORT_SIZES = [
-    {"width": 1920, "height": 1080},
-    {"width": 1366, "height": 768},
-    {"width": 1440, "height": 900},
-    {"width": 1536, "height": 864},
-    {"width": 2560, "height": 1440},
-    {"width": 1280, "height": 720},
-]
-
-# Common locales and timezones
-LOCALES = ["en-US", "en-GB", "en-CA"]
-TIMEZONES = ["America/New_York", "Europe/London", "Asia/Tokyo"]
+# Standard viewport size
+VIEWPORT = {"width": 1920, "height": 1080}
 
 
 class GoogleProgrammableScrapingSearchEngine(SearchEngine):
@@ -51,43 +33,44 @@ class GoogleProgrammableScrapingSearchEngine(SearchEngine):
     Designed to avoid rate limits and API quotas.
     """
 
-    def __init__(self, num_results: int = 10, link_site: str | None = None) -> None:
+    def __init__(
+        self,
+        num_results: int = 10,
+        link_site: str | None = None,
+        headless: bool = True,
+        slow_mo: int = 0,
+    ) -> None:
         """Initialize the Google Programmable Search Engine Scraper.
 
         Args:
             num_results: Number of results to return
             link_site: Optional site to filter results by
+            headless: Whether to run in headless mode (True by default)
+            slow_mo: Slows down Playwright operations by the specified amount of milliseconds (0 by default)
         """
         self.search_engine_id = os.environ["SEARCH_ENGINE_ID"]
         self.cse_url = "https://cse.google.com/cse"
         self.num_results = num_results
         self.link_site = link_site
-
+        self.headless = headless
+        self.slow_mo = slow_mo
         logger.info(
-            f"Initialized GoogleProgrammableScrapingSearchEngine with num_results={num_results}"
+            f"Initialized GoogleProgrammableScrapingSearchEngine with num_results={num_results}, headless={headless}, slow_mo={slow_mo}"
         )
         if link_site:
             logger.info(f"Filtering search results to site: {link_site}")
 
-    async def _random_sleep(self, min_seconds=1.0, max_seconds=4.0):
-        """Sleep for a random amount of time to simulate human behavior."""
-        await asyncio.sleep(random.uniform(min_seconds, max_seconds))
+    def _get_timestamp_filename(self, base_name: str) -> str:
+        """Generate a filename with timestamp for screenshots.
 
-    def _get_random_user_agent(self) -> str:
-        """Get a random user agent from the predefined list."""
-        return random.choice(USER_AGENTS)
+        Args:
+            base_name: Base name for the screenshot
 
-    def _get_random_viewport(self) -> dict:
-        """Get a random viewport size from the predefined list."""
-        return random.choice(VIEWPORT_SIZES)
-
-    def _get_random_locale(self) -> str:
-        """Get a random locale from the predefined list."""
-        return random.choice(LOCALES)
-
-    def _get_random_timezone(self) -> str:
-        """Get a random timezone from the predefined list."""
-        return random.choice(TIMEZONES)
+        Returns:
+            Filename with timestamp
+        """
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        return f".playwright/{base_name}_{timestamp}.png"
 
     async def _setup_playwright_context(
         self, playwright: Playwright
@@ -97,43 +80,23 @@ class GoogleProgrammableScrapingSearchEngine(SearchEngine):
         Returns:
             Tuple of (browser, context)
         """
-        # Select random user agent and viewport
-        user_agent = self._get_random_user_agent()
-        viewport = self._get_random_viewport()
-
-        # Configure browser to appear more human-like
+        # Configure browser with basic anti-bot detection
         browser = await playwright.chromium.launch(
-            headless=True,
+            headless=self.headless,
+            slow_mo=self.slow_mo,
             args=[
-                f"--user-agent={user_agent}",
+                f"--user-agent={USER_AGENT}",
                 "--disable-blink-features=AutomationControlled",
-                "--disable-features=IsolateOrigins,site-per-process",
             ],
         )
 
-        # Create context with specific viewport and additional settings
+        # Create context with fixed settings
         context = await browser.new_context(
-            viewport=viewport,  # type: ignore
-            user_agent=user_agent,
-            locale=self._get_random_locale(),
-            timezone_id=self._get_random_timezone(),
-            has_touch=random.choice([True, False]),
-            is_mobile=random.choice([
-                True,
-                False,
-                False,
-                False,
-            ]),  # Less likely to be mobile
+            viewport=VIEWPORT,  # type: ignore
+            user_agent=USER_AGENT,
+            locale="en-US",
+            timezone_id="America/New_York",
         )
-
-        # Add random cookies
-        await context.add_cookies([
-            {
-                "name": "session_pref",
-                "value": f"lang=en-{random.choice(['US', 'GB', 'CA'])}",
-                "url": "https://cse.google.com",
-            }
-        ])
 
         return browser, context
 
@@ -147,20 +110,17 @@ class GoogleProgrammableScrapingSearchEngine(SearchEngine):
             await self._cleanup_playwright(context, browser)
 
     async def _setup_page(self, context: BrowserContext) -> Page:
-        """Create and configure a new page with anti-bot detection measures.
+        """Create and configure a new page with basic anti-bot detection measures.
 
         Returns:
             Configured Playwright Page
         """
         page = await context.new_page()
 
-        # Modify JS properties to avoid detection
+        # Basic webdriver detection evasion
         await page.add_init_script("""
             Object.defineProperty(navigator, 'webdriver', {
                 get: () => false
-            });
-            Object.defineProperty(navigator, 'plugins', {
-                get: () => [1, 2, 3, 4, 5]
             });
         """)
 
@@ -176,34 +136,10 @@ class GoogleProgrammableScrapingSearchEngine(SearchEngine):
             await page.close()
 
     async def _navigate_to_results(self, page: Page, search_url: str):
-        """Navigate to search results with human-like behavior."""
-        # Initial navigation to Google
-        await page.goto("https://www.google.com")
-        await self._random_sleep(2.0, 5.0)
-
-        # Navigate to the search URL
+        """Navigate directly to search results."""
         await page.goto(search_url)
-
-    async def _simulate_human_behavior(self, page: Page):
-        """Perform random actions to simulate human-like browsing behavior."""
-        # Random scroll before results load
-        await page.mouse.move(random.randint(100, 700), random.randint(100, 300))
-
-        # Random scrolling to simulate reading
-        for _ in range(random.randint(1, 3)):
-            await page.mouse.wheel(0, random.randint(100, 300))
-            await self._random_sleep(0.5, 2.0)
-
-        # More random scrolling after results appear
-        for _ in range(random.randint(2, 4)):
-            await page.mouse.wheel(0, random.randint(200, 600))
-            await self._random_sleep(1.0, 3.0)
-
-        # Final random scrolling
-        if random.random() < 0.7:  # 70% chance
-            for _ in range(random.randint(1, 3)):
-                await page.mouse.wheel(0, random.randint(-200, 500))
-                await self._random_sleep(0.3, 1.5)
+        # Wait for document load state
+        await page.wait_for_load_state("domcontentloaded")
 
     async def _extract_search_results(self, page: Page) -> list[SearchResult]:
         """Extract search results from the page.
@@ -211,13 +147,34 @@ class GoogleProgrammableScrapingSearchEngine(SearchEngine):
         Returns:
             List of SearchResult objects
         """
-        # Wait for search results with jitter in timeout
-        await page.wait_for_selector(
-            ".gsc-webResult.gsc-result", timeout=random.randint(8000, 15000)
-        )
+        # Wait for the main results container to be visible
+        results_container_selector = ".gsc-results"
+        try:
+            await page.wait_for_selector(
+                results_container_selector,
+                state="visible",
+                timeout=15 * 1000,
+            )
+            logger.debug("Results container is visible.")
+        except Exception as e:
+            logger.error(
+                f"Timeout or error waiting for results container '{results_container_selector}': {e}"
+            )
+            # Capture a screenshot for debugging with timestamp
+            await page.screenshot(
+                path=self._get_timestamp_filename("debug_container_timeout")
+            )
+            return []  # Return empty list if container doesn't appear
 
-        # Extract search results
-        result_elements = await page.query_selector_all(".gsc-webResult.gsc-result")
+        result_selector = ".gsc-webResult.gsc-result"
+        result_elements = await page.query_selector_all(result_selector)
+
+        if not result_elements:
+            logger.warning(
+                f"Results container found, but no results matching '{result_selector}' found within it."
+            )
+            await page.screenshot(path=self._get_timestamp_filename("debug_no_results"))
+            return []
 
         scraped_results = []
         seen_urls = set()
@@ -225,38 +182,27 @@ class GoogleProgrammableScrapingSearchEngine(SearchEngine):
         # Limit to requested number of results
         result_elements = result_elements[: self.num_results]
 
-        for i, element in enumerate(result_elements):
-            # Add jitter between processing elements
-            if i > 0 and random.random() < 0.3:  # 30% chance
-                await self._random_sleep(0.2, 1.0)
+        for element in result_elements:
+            is_visible = await element.is_visible()
+            if not is_visible:
+                logger.warning("Skipping hidden result element.")
+                continue
 
-            # Hover over element to simulate user interest
-            element_box = await element.bounding_box()
-            if element_box:
-                await page.mouse.move(
-                    element_box["x"]
-                    + random.randint(10, int(element_box["width"] - 10)),
-                    element_box["y"]
-                    + random.randint(10, int(element_box["height"] - 10)),
-                )
-
-            # Extract title
             title_element = await element.query_selector(".gs-title")
             title = await title_element.text_content() if title_element else "No title"
             title = title.strip() if title else "No title"
 
-            # Extract URL
             url_element = await element.query_selector(".gs-title a")
             url = await url_element.get_attribute("href") if url_element else None
             url = url.strip() if url else "No URL"
 
-            # Extract description
             desc_element = await element.query_selector(".gs-snippet")
             description = (
                 await desc_element.text_content() if desc_element else "No description"
             )
             description = description.strip() if description else "No description"
-            if url and url not in seen_urls:
+
+            if url and url != "No URL" and url not in seen_urls:
                 seen_urls.add(url)
                 scraped_results.append(
                     SearchResult(
@@ -288,13 +234,10 @@ class GoogleProgrammableScrapingSearchEngine(SearchEngine):
         try:
             async with self._browser_context_manager(playwright) as context:
                 async with self._page_manager(context) as page:
-                    logger.info("Navigating to CSE URL with randomized browser profile")
+                    logger.info("Navigating to CSE URL")
 
                     # Navigate to search results
                     await self._navigate_to_results(page, search_url)
-
-                    # Simulate human behavior
-                    await self._simulate_human_behavior(page)
 
                     # Extract and return results
                     return await self._extract_search_results(page)

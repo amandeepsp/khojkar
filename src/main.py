@@ -6,10 +6,12 @@ from datetime import datetime, timezone
 
 import click
 import requests
+from diskcache import Cache
 
 import utils
 from agents.deep_research import DeepResearchAgent
-from core.tool import Tool, ToolRegistry
+from core.cached_tool import CachedTool
+from core.tool import Tool, ToolProtocol, ToolRegistry
 from prompts import deep_research_prompt
 from scraping.trafilatura_scaper import TrafilaturaScraper
 from search.arxiv import ArxivSearchEngine
@@ -21,6 +23,10 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
+
+# --- Caching Setup ---
+CACHE_DIR = ".cache/tool_cache"
+tool_cache = Cache(CACHE_DIR)
 
 
 @click.group()
@@ -69,11 +75,12 @@ async def execute_research(
     topic: str, model: str, output_path: str, max_steps: int
 ) -> str:
     """Execute the research using a ReACT agent"""
-    # Create empty tool registry (to be populated later)
     tool_registry = ToolRegistry()
 
     google_search = GoogleProgrammableSearchEngine(num_results=10)
-    google_scraping_search = GoogleProgrammableScrapingSearchEngine(num_results=10)
+    google_scraping_search = GoogleProgrammableScrapingSearchEngine(
+        num_results=10, headless=True, slow_mo=100
+    )
 
     search = FallbackSearchEngine(
         primary_engine=google_search,
@@ -85,30 +92,46 @@ async def execute_research(
 
     scraper = TrafilaturaScraper()
 
-    google_search_tool = Tool(
-        name="google_search",
-        func=search.search_and_stitch,
+    # 1. Initialize original Tool instances
+    google_search_tool: ToolProtocol = CachedTool(
+        Tool(
+            name="google_search",
+            func=search.search_and_stitch,
+            description="Use this tool to search the web for general information. Useful for getting a broad overview of a topic.",
+        ),
+        cache=tool_cache,
     )
 
-    arxiv_search_tool = Tool(
-        name="arxiv_search",
-        func=arxiv_search.search_and_stitch,
+    arxiv_search_tool = CachedTool(
+        Tool(
+            name="arxiv_search",
+            func=arxiv_search.search_and_stitch,
+            description="Use this tool to search Arxiv for academic papers, research papers, and other scholarly articles. Useful for more technical and academic topics.",
+        ),
+        cache=tool_cache,
     )
 
-    web_scrape_tool = Tool(
-        name="scrape_url",
-        func=scraper.scrape_url,
+    web_scrape_tool = CachedTool(
+        Tool(
+            name="scrape_url",
+            func=scraper.scrape_url,
+            description="Use this tool to scrape a specific URL for information. Useful for getting detailed information from a specific website.",
+        ),
+        cache=tool_cache,
     )
 
-    tool_registry = ToolRegistry()
     tool_registry.register(google_search_tool)
     tool_registry.register(web_scrape_tool)
     tool_registry.register(arxiv_search_tool)
 
+    tool_descriptions = tool_registry._tool_descriptions()
+    current_date_str = datetime.now(timezone.utc).strftime("%B %d, %Y")
+
     prompt = deep_research_prompt.format(
         question=topic,
         report_format="apa",
-        current_date=datetime.now(timezone.utc).strftime("%B %d, %Y"),
+        current_date=current_date_str,
+        tool_descriptions=tool_descriptions,
     )
 
     agent = DeepResearchAgent(

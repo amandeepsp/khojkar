@@ -23,3 +23,5 @@ notebooks/
 !README.md
 
 mlruns/
+
+.cache/
