@@ -1,34 +1,31 @@
 import inspect
 import logging
-from typing import Any, Callable, Protocol
+from typing import Any, Callable, Protocol, runtime_checkable
 
 import docstring_parser
 
 logger = logging.getLogger(__name__)
 
 
-class ToolProtocol(Protocol):
-    @property
-    def name(self) -> str: ...
-
-    @property
-    def func(self) -> Callable[..., Any]: ...
-
-    @property
-    def schema(self) -> dict: ...
-
-    @property
-    def max_result_length(self) -> int | None: ...
-
-    @property
-    def description(self) -> str | None: ...
+@runtime_checkable
+class Tool(Protocol):
+    name: str
+    func: Callable[..., Any]
+    schema: dict
+    max_result_length: int | None = None
+    description: str | None = None
 
     def formatted_signature(self) -> str: ...
 
     async def __call__(self, **kwargs: Any) -> Any: ...
 
 
-class Tool:
+class FunctionTool:
+    """
+    A tool that is a **pure-ish** function.
+    Same input can return different outputs, but still should not have side effects.
+    """
+
     def __init__(
         self,
         name: str,
@@ -144,9 +141,9 @@ class Tool:
 
 class ToolRegistry:
     def __init__(self) -> None:
-        self.tools: dict[str, ToolProtocol] = {}
+        self.tools: dict[str, Tool] = {}
 
-    def register(self, tool: ToolProtocol) -> None:
+    def register(self, tool: Tool) -> None:
         self.tools[tool.name] = tool
 
     def tool_schemas(self) -> list[dict]:
@@ -157,8 +154,8 @@ class ToolRegistry:
             f"- `{tool.formatted_signature()}`" for tool in self.tools.values()
         )
 
-    def get(self, name: str) -> ToolProtocol:
+    def get(self, name: str) -> Tool:
         return self.tools[name]
 
-    def __getitem__(self, key: str) -> ToolProtocol:
+    def __getitem__(self, key: str) -> Tool:
         return self.tools[key]

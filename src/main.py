@@ -11,7 +11,7 @@ from diskcache import Cache
 import utils
 from agents.deep_research import DeepResearchAgent
 from core.cached_tool import CachedTool
-from core.tool import Tool, ToolProtocol, ToolRegistry
+from core.tool import FunctionTool, Tool, ToolRegistry
 from prompts import deep_research_prompt
 from scraping.trafilatura_scaper import TrafilaturaScraper
 from search.arxiv import ArxivSearchEngine
@@ -93,8 +93,8 @@ async def execute_research(
     scraper = TrafilaturaScraper()
 
     # 1. Initialize original Tool instances
-    google_search_tool: ToolProtocol = CachedTool(
-        Tool(
+    google_search_tool: Tool = CachedTool(
+        FunctionTool(
             name="google_search",
             func=search.search_and_stitch,
             description="Use this tool to search the web for general information. Useful for getting a broad overview of a topic.",
@@ -103,7 +103,7 @@ async def execute_research(
     )
 
     arxiv_search_tool = CachedTool(
-        Tool(
+        FunctionTool(
             name="arxiv_search",
             func=arxiv_search.search_and_stitch,
             description="Use this tool to search Arxiv for academic papers, research papers, and other scholarly articles. Useful for more technical and academic topics.",
@@ -112,7 +112,7 @@ async def execute_research(
     )
 
     web_scrape_tool = CachedTool(
-        Tool(
+        FunctionTool(
             name="scrape_url",
             func=scraper.scrape_url,
             description="Use this tool to scrape a specific URL for information. Useful for getting detailed information from a specific website.",

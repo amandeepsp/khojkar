@@ -1,24 +1,20 @@
-from abc import ABC, abstractmethod
-from typing import Any, Generic, TypeVar
+from typing import Optional, Protocol, runtime_checkable
 
 from core.tool import ToolRegistry
 
-T = TypeVar("T")  # Define a type variable for the return type
 
+@runtime_checkable
+class Agent(Protocol):
+    """
+    Protocol defining the interface for an agent.
+    Any object that satisfies this protocol can be used as an agent.
+    """
 
-class Agent(Generic[T], ABC):
-    def __init__(
-        self,
-        name: str,
-        model: str,
-        tool_registry: ToolRegistry = ToolRegistry(),
-        next_agents: list["Agent[Any]"] = [],
-    ) -> None:
-        self.name = name
-        self.model = model
-        self.tool_registry = tool_registry
-        self.next_agents = next_agents
+    name: str
+    description: str
+    model: str
+    tool_registry: ToolRegistry = ToolRegistry()
+    children: list["Agent"] = []
+    parent: Optional["Agent"] = None
 
-    @abstractmethod
-    async def run(self) -> T:
-        pass
+    async def run(self, **kwargs): ...

@@ -1,11 +1,11 @@
 import datetime
 import json
 import logging
-from typing import Any, Callable
+from typing import Any
 
 from diskcache import Cache
 
-from .tool import Tool
+from .tool import FunctionTool
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +15,7 @@ DEFAULT_CACHE_TTL: int = int(datetime.timedelta(days=1).total_seconds())
 class CachedTool:
     """A wrapper that adds caching to an existing Tool instance using composition."""
 
-    def __init__(self, delegate_tool: Tool, cache: Cache):
+    def __init__(self, delegate_tool: FunctionTool, cache: Cache):
         """
         Initializes the CachedTool wrapper.
 
@@ -26,26 +26,11 @@ class CachedTool:
 
         self._delegate = delegate_tool
         self.cache = cache
-
-    @property
-    def name(self) -> str:
-        return self._delegate.name
-
-    @property
-    def schema(self) -> dict:
-        return self._delegate.schema
-
-    @property
-    def func(self) -> Callable[..., Any]:
-        return self._delegate.func
-
-    @property
-    def max_result_length(self) -> int | None:
-        return self._delegate.max_result_length
-
-    @property
-    def description(self) -> str | None:
-        return self._delegate.description
+        self.name = delegate_tool.name
+        self.schema = delegate_tool.schema
+        self.func = delegate_tool.func
+        self.max_result_length = delegate_tool.max_result_length
+        self.description = delegate_tool.description
 
     def formatted_signature(self) -> str:
         return self._delegate.formatted_signature()

@@ -25,3 +25,4 @@ notebooks/
 mlruns/
 
 .cache/
+src/_scratch.py
