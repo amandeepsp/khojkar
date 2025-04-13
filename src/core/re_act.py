@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Callable, override
+from typing import override
 
 import litellm
 
@@ -65,7 +65,7 @@ class ReActAgent(Agent[litellm.Message]):
                 if tool_call_result:
                     # Truncate to max_result_length characters with a note if truncated
                     if (
-                        tool.max_result_length is not None
+                        tool.max_result_length
                         and len(tool_call_result) > tool.max_result_length
                     ):
                         tool_call_result = (

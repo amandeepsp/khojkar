@@ -105,6 +105,8 @@ class FallbackSearchEngine(SearchEngine):
                 logger.warning(
                     f"Primary search failed with recognized error condition: {str(e)}. Using fallback engine."
                 )
+                fallback_results = await self.fallback._search(query)
+
                 self.fallback_count += 1
                 logger.info(f"Fallback count increased to {self.fallback_count}")
 
@@ -112,7 +114,7 @@ class FallbackSearchEngine(SearchEngine):
                 if self.fallback_count >= self.fallback_threshold:
                     self._swap_engines()
 
-                return await self.fallback._search(query)
+                return fallback_results
             else:
                 logger.error(
                     f"Primary search failed with unrecognized error: {str(e)}. Error does not match fallback conditions."

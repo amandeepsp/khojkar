@@ -41,7 +41,7 @@ Once confirmed:
   • Prioritize newer and more credible sources.
   • Insert inline citations in the format: `[^1]`, `[^2]`, etc.
   • At the end of the report, generate a 'References' section using the citation info. Format each reference like:
-      `[^1] Author. (Year). *Title*. Website. [domain](url)`
+      `[^1]: Author. (Year). *Title*. Website. [domain](url)\n`
 
 Only use sources you've scraped and cited. Avoid vague generalizations.
 Form your own opinion based on the research.
