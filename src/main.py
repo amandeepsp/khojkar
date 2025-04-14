@@ -9,7 +9,7 @@ import requests
 from diskcache import Cache
 
 import utils
-from agents.deep_research import DeepResearchAgent
+from agents.naive.deep_research import DeepResearchAgent
 from core.cached_tool import CachedTool
 from core.tool import FunctionTool, Tool, ToolRegistry
 from prompts import deep_research_prompt
@@ -92,7 +92,6 @@ async def execute_research(
 
     scraper = TrafilaturaScraper()
 
-    # 1. Initialize original Tool instances
     google_search_tool: Tool = CachedTool(
         FunctionTool(
             name="google_search",

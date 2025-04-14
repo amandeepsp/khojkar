@@ -56,7 +56,7 @@ class DeepResearchAgent:
 
         confirm_report = litellm.completion(
             model=self._delegate_agent.model,
-            messages=self._delegate_agent.messages.get(),
+            messages=self._delegate_agent.messages.get_all(),
             tools=self._delegate_agent.tool_registry.tool_schemas(),
             tool_choice="auto",
             temperature=0.0,

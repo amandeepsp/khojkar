@@ -1,15 +1,11 @@
-from abc import ABC, abstractmethod
+from typing import Protocol
 
 
-class Memory(ABC):
-    @abstractmethod
-    def add(self, memory: str):
-        pass
+class Memory(Protocol):
+    def add(self, memory: str): ...
 
-    @abstractmethod
-    def get(self):
-        pass
+    def get_all(self): ...
 
-    @abstractmethod
-    def clear(self):
-        pass
+    def query(self, query: str): ...
+
+    def clear(self): ...

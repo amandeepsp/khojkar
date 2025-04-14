@@ -39,13 +39,17 @@ class InContextMemory(Memory):
             logger.info(f"Context pruned to {len(self.messages)} messages")
 
     @override
-    def get(self):
+    def get_all(self):
         return self.messages
 
     @override
     def clear(self):
         self.messages = [{"role": "user", "content": self.system_prompt}]
         self.total_tokens = self._num_tokens_from_string(self.system_prompt)
+
+    @override
+    def query(self, query: str):
+        raise NotImplementedError("InContextMemory does not support querying")
 
     def __len__(self):
         return len(self.messages)

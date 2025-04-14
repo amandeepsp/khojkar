@@ -105,7 +105,7 @@ class ReActAgent:
 
             response = litellm.completion(
                 model=self.model,
-                messages=self.messages.get(),
+                messages=self.messages.get_all(),
                 tools=self.tool_registry.tool_schemas(),
                 tool_choice="auto",
                 temperature=self.default_temperature,
@@ -124,5 +124,5 @@ class ReActAgent:
             await asyncio.gather(*self._throttle_tool_calls(tool_calls))
 
         # If we reach max_steps without the LLM deciding to stop, return the last response
-        logger.info("Reached maximum number of steps, returning last response")
-        return response.choices[0].message  # type: ignore
+        logger.error("Reached maximum number of steps, still tool calls remaining")
+        raise StopIteration("Reached maximum number of steps")
