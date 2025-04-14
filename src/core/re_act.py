@@ -6,6 +6,7 @@ from typing import Any, Optional
 import litellm
 from pydantic import BaseModel
 
+import utils
 from core.agent import Agent
 from core.tool import ToolRegistry
 from memory.context import InContextMemory
@@ -13,7 +14,7 @@ from memory.context import InContextMemory
 logger = logging.getLogger(__name__)
 
 
-class ReActAgent:
+class ReActAgent(Agent):
     def __init__(
         self,
         name: str,
@@ -24,6 +25,7 @@ class ReActAgent:
         max_steps: int = 10,
         default_temperature: float = 0.3,
         max_concurrent_tool_calls: int = 3,
+        output_format: type[BaseModel] | None = None,
     ):
         self.name = name
         self.description = description
@@ -35,6 +37,7 @@ class ReActAgent:
         self.current_step = 0
         self.default_temperature = default_temperature
         self.max_concurrent_tool_calls = max_concurrent_tool_calls
+        self.output_format = output_format
         # For compatibility with Agent protocol
         self.children: list[Agent] = []
         self.parent: Optional[Agent] = None
@@ -96,6 +99,29 @@ class ReActAgent:
             "tool_call_id": tool_call_id,
         })
 
+    def _prompt_model_to_format_response(self) -> Any:
+        assert self.output_format is not None
+        self.messages.add({
+            "role": "user",
+            "content": "Please format the response as JSON according to the following JSON Schema: \n"
+            + json.dumps(self.output_format.model_json_schema()),
+        })
+
+        response = litellm.completion(
+            model=self.model,
+            messages=self.messages.get_all(),
+            tool_choice="auto",
+            temperature=self.default_temperature,
+            output_format=self.output_format.model_json_schema(),
+        )
+
+        return self.output_format.model_validate_json(
+            utils.extract_lang_block(
+                response.choices[0].message.content,  # type: ignore
+                language="json",
+            )
+        )
+
     async def run(self, **kwargs) -> Any:
         self.messages.clear()
 
@@ -119,6 +145,9 @@ class ReActAgent:
 
             if not tool_calls:
                 logger.info("No further actions needed, finalizing results")
+                if self.output_format:
+                    return self._prompt_model_to_format_response()
+
                 return response.choices[0].message  # type: ignore
 
             await asyncio.gather(*self._throttle_tool_calls(tool_calls))

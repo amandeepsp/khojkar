@@ -26,3 +26,5 @@ mlruns/
 
 .cache/
 src/_scratch.py
+
+*.mp3

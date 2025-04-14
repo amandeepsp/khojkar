@@ -1,3 +1,4 @@
+import json
 import logging
 from typing import Any
 
@@ -8,7 +9,7 @@ from core.tool import FunctionTool, ToolRegistry
 logger = logging.getLogger(__name__)
 
 
-class SupervisorAgent:
+class SupervisorAgent(Agent):
     """
     A generic supervisor agent that manages and coordinates other agents.
 
@@ -29,12 +30,7 @@ class SupervisorAgent:
         children: list[Agent] = [],
         max_steps: int = 10,
     ):
-        self.name = name
-        self.model = model
-        self.children = children
-        self.parent = None
-        self.max_steps = max_steps
-        self.system_prompt = system_prompt
+        system_prompt += self._agent_schemas()
         self._internal_agent: Agent = ReActAgent(
             name=f"{name}_supervisor",
             description=description,
@@ -46,7 +42,6 @@ class SupervisorAgent:
 
         # Create a registry of available agents by name
         self.agent_registry = {agent.name: agent for agent in children}
-        self._append_agent_schemas()
 
         # Handoff tool
         handoff_tool = FunctionTool(
@@ -58,17 +53,24 @@ class SupervisorAgent:
         if "handoff_to_agent" not in tool_registry.tools:
             tool_registry.register(handoff_tool)
 
-    def _append_agent_schemas(self):
-        # TODO: Add in JSON format for sub_agents
-        self.system_prompt += f"""
-        <sub_agents>
-        {
-            "\n".join([
-                f"Agent: {agent.name}\nDescription: {agent.description}"
-                for agent in self.children
-            ])
-        }
-        </sub_agents>
+    @property
+    def name(self) -> str:
+        return self._internal_agent.name
+
+    @property
+    def description(self) -> str:
+        return self._internal_agent.description
+
+    @property
+    def model(self) -> str:
+        return self._internal_agent.model
+
+    def _agent_schemas(self) -> str:
+        return f"""
+        -------
+        AVAILABLE AGENTS:
+        {json.dumps([agent.to_json() for agent in self.children])}
+        -------
         """
 
     async def _route_to_agent(self, agent_name: str):

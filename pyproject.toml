@@ -3,7 +3,7 @@ name = "khojkar"
 version = "0.2.1"
 description = "A tool for conducting deep research on a given topic, using a combination of LLMs, search engines, and other tools."
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.12,<3.13"
 dependencies = [
     "python-dotenv>=1.1.0",
     "click>=8.1.8",
@@ -28,6 +28,10 @@ dev = [
     "notebook>=7.3.3",
     "ruff>=0.11.4",
 ]
+
+[build-system]
+requires = ["setuptools>=65", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [project.scripts]
 khojkar = "main:cli"

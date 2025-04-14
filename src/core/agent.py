@@ -18,3 +18,9 @@ class Agent(Protocol):
     parent: Optional["Agent"] = None
 
     async def run(self, **kwargs): ...
+
+    def to_json(self) -> dict:
+        return {
+            "name": self.name,
+            "description": self.description,
+        }
