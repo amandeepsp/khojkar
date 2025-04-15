@@ -1,7 +1,7 @@
 import asyncio
 import json
 import logging
-from typing import Any, Optional
+from typing import Any
 
 import litellm
 from pydantic import BaseModel
@@ -38,22 +38,14 @@ class ReActAgent(Agent):
         self.default_temperature = default_temperature
         self.max_concurrent_tool_calls = max_concurrent_tool_calls
         self.output_format = output_format
-        # For compatibility with Agent protocol
-        self.children: list[Agent] = []
-        self.parent: Optional[Agent] = None
 
-    def _safe_json_serialize(self, obj):
-        if isinstance(obj, str):
-            return obj
-
+    def _safe_json_serialize(self, obj: Any) -> str:
+        """Tool calls can return non-serializable objects, so we need to serialize them to a string"""
         if isinstance(obj, BaseModel):
             return obj.model_dump_json()
-
-        try:
+        if isinstance(obj, (dict, list)):
             return json.dumps(obj)
-        except Exception as e:
-            logger.warning(f"Failed to serialize object: {obj}, error: {e}")
-            return str(obj)
+        return str(obj)
 
     def _throttle_tool_calls(self, tool_calls):
         semaphore = asyncio.Semaphore(self.max_concurrent_tool_calls)
@@ -124,6 +116,12 @@ class ReActAgent(Agent):
 
     async def run(self, **kwargs) -> Any:
         self.messages.clear()
+
+        if "extra_prompt" in kwargs:
+            self.messages.add({
+                "role": "user",
+                "content": kwargs["extra_prompt"],
+            })
 
         for _ in range(self.max_steps):
             self.current_step += 1

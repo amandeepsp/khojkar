@@ -30,8 +30,9 @@ class SupervisorAgent(Agent):
         children: list[Agent] = [],
         max_steps: int = 10,
     ):
+        self.children = children
         system_prompt += self._agent_schemas()
-        self._internal_agent: Agent = ReActAgent(
+        self._delegate: ReActAgent = ReActAgent(
             name=f"{name}_supervisor",
             description=description,
             model=model,
@@ -55,15 +56,15 @@ class SupervisorAgent(Agent):
 
     @property
     def name(self) -> str:
-        return self._internal_agent.name
+        return self._delegate.name
 
     @property
     def description(self) -> str:
-        return self._internal_agent.description
+        return self._delegate.description
 
     @property
     def model(self) -> str:
-        return self._internal_agent.model
+        return self._delegate.model
 
     def _agent_schemas(self) -> str:
         return f"""
@@ -73,7 +74,7 @@ class SupervisorAgent(Agent):
         -------
         """
 
-    async def _route_to_agent(self, agent_name: str):
+    async def _route_to_agent(self, agent_name: str, **kwargs):
         """
         Route the task to a specific agent or finish the workflow.
         Args:
@@ -85,7 +86,11 @@ class SupervisorAgent(Agent):
 
         logger.info(f"Handing off to agent {agent_name}")
         agent = self.agent_registry[agent_name]
-        return await agent.run()
+
+        actual_kwargs = kwargs["kwargs"]
+        if not actual_kwargs:
+            return await agent.run()
+        return await agent.run(extra_prompt=json.dumps(actual_kwargs))
 
     async def run(self, **kwargs) -> Any:
-        return await self._internal_agent.run(**kwargs)
+        return await self._delegate.run(**kwargs)

@@ -64,7 +64,6 @@ class FunctionTool:
             bool: "boolean",
             list: "array",
             dict: "object",
-            type(None): "null",
         }
 
         doc = inspect.getdoc(self.func)
@@ -80,6 +79,13 @@ class FunctionTool:
         parameters_descriptions = parsed_docstring.params
         parameters = {}
         for param in signature.parameters.values():
+            if param.name == "kwargs":
+                parameters["kwargs"] = {
+                    "type": "object",
+                    "description": "Additional arguments to pass to the function, should be a json serialezable object",
+                }
+                continue
+
             try:
                 param_type = type_map.get(param.annotation)
             except KeyError as e:
