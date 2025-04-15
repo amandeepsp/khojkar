@@ -4,10 +4,12 @@ import uuid
 import chromadb
 from chromadb.utils import embedding_functions
 
+from memory.memory import Memory
+
 logger = logging.getLogger(__name__)
 
 
-class VectorStoreMemory:
+class VectorStoreMemory(Memory):
     """
     Memory implementation using ChromaDB for storing and retrieving
     text snippets based on semantic similarity.

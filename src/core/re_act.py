@@ -3,13 +3,14 @@ import json
 import logging
 from typing import Any
 
-import litellm
+from langfuse.decorators import observe
 from pydantic import BaseModel
 
+import llm
 import utils
 from core.agent import Agent
 from core.tool import ToolRegistry
-from memory.context import InContextMemory
+from memory.context import MessagesMemory
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,7 @@ class ReActAgent(Agent):
         self.tool_registry = tool_registry
         self.max_steps = max_steps
         self.prompt = prompt
-        self.messages = InContextMemory(system_prompt=prompt, max_tokens=1_000_000_000)
+        self.messages = MessagesMemory(system_prompt=prompt, max_tokens=1_000_000_000)
         self.current_step = 0
         self.default_temperature = default_temperature
         self.max_concurrent_tool_calls = max_concurrent_tool_calls
@@ -91,7 +92,7 @@ class ReActAgent(Agent):
             "tool_call_id": tool_call_id,
         })
 
-    def _prompt_model_to_format_response(self) -> Any:
+    async def _prompt_model_to_format_response(self) -> Any:
         assert self.output_format is not None
         self.messages.add({
             "role": "user",
@@ -99,7 +100,7 @@ class ReActAgent(Agent):
             + json.dumps(self.output_format.model_json_schema()),
         })
 
-        response = litellm.completion(
+        response = await llm.acompletion(
             model=self.model,
             messages=self.messages.get_all(),
             tool_choice="auto",
@@ -114,6 +115,7 @@ class ReActAgent(Agent):
             )
         )
 
+    @observe(name="re_act.run")
     async def run(self, **kwargs) -> Any:
         self.messages.clear()
 
@@ -127,7 +129,7 @@ class ReActAgent(Agent):
             self.current_step += 1
             logger.info(f"Running ReACT agent with {len(self.messages)} messages")
 
-            response = litellm.completion(
+            response = await llm.acompletion(
                 model=self.model,
                 messages=self.messages.get_all(),
                 tools=self.tool_registry.tool_schemas(),

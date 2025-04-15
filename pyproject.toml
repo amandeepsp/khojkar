@@ -24,6 +24,7 @@ dependencies = [
 dev = [
     "ipykernel>=6.29.5",
     "jupyter>=1.1.1",
+    "langfuse>=2.60.2",
     "mypy>=1.15.0",
     "notebook>=7.3.3",
     "ruff>=0.11.4",

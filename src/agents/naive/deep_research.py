@@ -2,6 +2,7 @@ import logging
 
 import litellm
 
+import llm
 from core.re_act import ReActAgent
 from core.tool import ToolRegistry
 
@@ -54,7 +55,7 @@ class DeepResearchAgent:
 
         logger.info("Generating final report")
 
-        confirm_report = litellm.completion(
+        confirm_report = await llm.acompletion(
             model=self._delegate_agent.model,
             messages=self._delegate_agent.messages.get_all(),
             tools=self._delegate_agent.tool_registry.tool_schemas(),

@@ -2,6 +2,8 @@ import json
 import logging
 from typing import Any
 
+from langfuse.decorators import observe
+
 from core.agent import Agent
 from core.re_act import ReActAgent
 from core.tool import FunctionTool, ToolRegistry
@@ -92,5 +94,6 @@ class SupervisorAgent(Agent):
             return await agent.run()
         return await agent.run(extra_prompt=json.dumps(actual_kwargs))
 
+    @observe(name="supervisor.run")
     async def run(self, **kwargs) -> Any:
         return await self._delegate.run(**kwargs)
