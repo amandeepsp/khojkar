@@ -1,47 +1,43 @@
-from typing import Literal, Optional
+from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class Subtopics(BaseModel):
-    subtopics: list[str]
+    subtopics: list[str] = Field(description="List of subtopics to research")
 
 
 class Questions(BaseModel):
-    subtopic: str
-    questions: list[str]
+    subtopic: str = Field(description="Subtopic to research")
+    questions: list[str] = Field(
+        description="List of questions to generated from the subtopic"
+    )
 
 
 class Citation(BaseModel):
-    title: str
-    author: Optional[str] = None
-    published_date: Optional[str] = None
-    website: Optional[str] = None
-    url: str
+    title: str = Field(description="Title of the citation")
+    author: Optional[str] = Field(description="Author of the citation")
+    published_date: Optional[str] = Field(description="Published date of the citation")
+    website: Optional[str] = Field(description="Website of the citation")
+    url: str = Field(description="URL of the citation")
 
 
 class Retrieval(BaseModel):
-    summary: str
-    full_text: str
-    citations: list[Citation]
+    summary: str = Field(description="Summary of the retrieval")
+    citations: list[Citation] = Field(
+        description="List of citations from the retrieval"
+    )
+    memory_id: Optional[str] = Field(description="ID of the memory")
 
 
 class Retrievals(BaseModel):
-    question: str
-    retrievals: list[Retrieval]
-
-
-class Comparison(BaseModel):
-    question: str
-    comparison_summary: str
-    agreement: bool
-    technical_detail: Literal["high", "medium", "low"]
-    bias: Literal["high", "medium", "low", "unknown"]
-    recency: Literal["high", "medium", "low", "unknown"]
-    credibility: Literal["high", "medium", "low", "unknown"]
+    question: str = Field(description="Question to research")
+    retrievals: list[Retrieval] = Field(
+        description="List of retrievals from the question"
+    )
 
 
 class Reflection(BaseModel):
-    question: str
-    gaps: list[str]
-    improvements: list[str]
+    question: str = Field(description="Question to research")
+    gaps: list[str] = Field(description="List of gaps in the retrieval")
+    improvements: list[str] = Field(description="List of improvements to the retrieval")

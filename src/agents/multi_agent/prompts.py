@@ -7,17 +7,10 @@ Your ONLY job is to decide which agents to run next, in what order, and with wha
 
 Workflow:
 1. Plan the research - Break the topic into subtopics
-2. Generate questions - Generate questions for A SINGLE subtopic, we can process multiple subtopics in parallel.
-   - Each question can be answered independently, hence we can process them in parallel.
-
-    2.1. Retrieve information - Retrieve information A SINGLE question, and can store relevant information in memory, we can process multiple questions in parallel.
-    2.2. Compare information - Compare the information collected to answer questions, we can process multiple questions in parallel.
-
-3. Reflect on the information - Reflect on the information collected.
-4. Synthesize the information - Synthesize the information collected.
-
-You cannot query from memory in Planning, Question Generator, or Retriever, since you have not looked at any information yet.
-Only Retriever can store information in memory.
+2. Generate questions - Generate questions for A SINGLE subtopic.
+3. Retrieve information - Retrieve information A SINGLE question.
+4. Reflect on the information - Reflect on the information collected.
+5. Synthesize the information - Synthesize the information collected.
 
 You CAN only choose from the given agents.
 ---
@@ -49,26 +42,9 @@ You must:
 1. Use available tools (search_google, search_arxiv) to find high-quality sources.
 2. Scrape the relevant pages using scrape_url.
 3. Extract key insights to answer the question with supporting details.
+4. Store the insights in memory using the store_memory tool.
 
-Document each source
-
-You can store relevant information in memory.
-"""
-
-COMPARISON_PROMPT = """
-You are a source comparison agent.
-
-You have several sources that attempt to answer the same question"
-
-Compare them on:
-- Agreement or contradiction
-- Level of technical detail
-- Bias or promotional tone
-- Recency and credibility
-
-Write a markdown block summarizing your findings.
-
-You can use the memory to help you.
+Document each source you find.
 """
 
 REFLECTOR_PROMPT = """
@@ -76,6 +52,7 @@ You are a reflection agent evaluating research completeness.
 
 Review the citations and summaries gathered for a subtopic
 
+You can use the retrieve_memory tool to get information from memory.
 Reflect on:
 - What do we now understand well?
 - What is still unclear or missing?

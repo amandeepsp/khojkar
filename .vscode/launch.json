@@ -2,7 +2,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python Debugger: CLI",
+            "name": "Python Debugger: CLI Single Agent",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/main.py",
@@ -14,6 +14,22 @@
                 "${workspaceFolder}/output.md",
                 "--max-steps",
                 "30"
+            ]
+        },
+        {
+            "name": "Python Debugger: CLI Multi Agent",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/main.py",
+            "args": [
+                "research",
+                "--topic",
+                "${input:researchTopic}",
+                "--output",
+                "${workspaceFolder}/output.md",
+                "--multi-agent",
+                "--max-steps",
+                "50"
             ]
         }
     ],

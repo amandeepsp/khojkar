@@ -1,7 +1,7 @@
 import asyncio
 import json
 import logging
-from typing import Any
+from typing import Any, Optional, Type
 
 from pydantic import BaseModel
 
@@ -12,6 +12,13 @@ from core.tool import ToolRegistry
 from memory.context import MessagesMemory
 
 logger = logging.getLogger(__name__)
+
+
+class AgentLoggerAdapter(logging.LoggerAdapter):
+    def process(self, msg, kwargs):
+        if self.extra is None or self.extra["agent_name"] is None:
+            return msg, kwargs
+        return f"[agent: {self.extra['agent_name']}] {msg}", kwargs
 
 
 class ReActAgent(Agent):
@@ -25,7 +32,7 @@ class ReActAgent(Agent):
         max_steps: int = 10,
         default_temperature: float = 0.3,
         max_concurrent_tool_calls: int = 3,
-        output_format: type[BaseModel] | None = None,
+        output_format: Optional[Type[BaseModel]] = None,
     ):
         self.name = name
         self.description = description
@@ -38,6 +45,7 @@ class ReActAgent(Agent):
         self.default_temperature = default_temperature
         self.max_concurrent_tool_calls = max_concurrent_tool_calls
         self.output_format = output_format
+        self.logger = AgentLoggerAdapter(logger, {"agent_name": self.name})
 
     def _safe_json_serialize(self, obj: Any) -> str:
         """Tool calls can return non-serializable objects, so we need to serialize them to a string"""
@@ -62,19 +70,19 @@ class ReActAgent(Agent):
         tool_args = json.loads(tool_call.function.arguments)
         tool_call_id = tool_call.id
 
-        logger.info(f"Using tool: {tool_call.function.name}, args: {tool_args}")
+        self.logger.info(f"Using tool: {tool_call.function.name}, args: {tool_args}")
         tool_call_result = None
         try:
             tool_call_result = await tool(**tool_args)
             tool_call_result = self._safe_json_serialize(tool_call_result)
         except Exception as e:
-            logger.warning(
+            self.logger.warning(
                 f"Tool call {tool_call.function.name} failed, args: {tool_args}, error: {e}"
             )
             tool_call_result = f"Tool call {tool_call.function.name} failed, please try some other tool"
 
         if not tool_call_result:
-            logger.warning(
+            self.logger.warning(
                 f"Tool call {tool_call.function.name} failed, args: {tool_args}"
             )
             tool_call_result = f"Tool call {tool_call.function.name} failed, please try some other tool"
@@ -84,6 +92,7 @@ class ReActAgent(Agent):
                 tool_call_result[: tool.max_result_length]
                 + "\n\n[Content truncated due to length...]"
             )
+            self.logger.info("Tool call result truncated due to length.")
 
         self.messages.add({
             "role": "tool",
@@ -129,7 +138,7 @@ class ReActAgent(Agent):
 
         for _ in range(self.max_steps):
             self.current_step += 1
-            logger.info(f"Running ReACT agent with {len(self.messages)} messages")
+            self.logger.info(f"Running ReACT agent with {len(self.messages)} messages")
 
             response = await llm.acompletion(
                 model=self.model,
@@ -139,7 +148,7 @@ class ReActAgent(Agent):
                 temperature=self.default_temperature,
             )
 
-            logger.info(f"Thinking...\n\n{response.choices[0].message.content}")  # type: ignore
+            self.logger.info(f"Thinking...\n\n{response.choices[0].message.content}")  # type: ignore
 
             sanitized_response = utils.remove_thinking_output(
                 response.choices[0].message.content  # type: ignore
@@ -154,16 +163,16 @@ class ReActAgent(Agent):
             tool_calls = response.choices[0].message.tool_calls  # type: ignore
 
             if not tool_calls:
-                logger.info("No further actions needed, finalizing results")
+                self.logger.info("No further actions needed, finalizing results")
                 if self.output_format:
                     return await self._prompt_model_to_format_response()
 
                 return response.choices[0].message  # type: ignore
 
-            logger.info(f"Processing {len(tool_calls)} tool call(s)")
+            self.logger.info(f"Processing {len(tool_calls)} tool call(s)")
 
             await asyncio.gather(*self._throttle_tool_calls(tool_calls))
 
         # If we reach max_steps without the LLM deciding to stop, return the last response
-        logger.error("Reached maximum number of steps, still tool calls remaining")
+        self.logger.error("Reached maximum number of steps, still tool calls remaining")
         raise StopIteration("Reached maximum number of steps")

@@ -7,7 +7,7 @@ from aiolimiter import AsyncLimiter
 logger = logging.getLogger(__name__)
 
 
-llm_rate_limiter = AsyncLimiter(2)
+llm_rate_limiter = AsyncLimiter(5)
 
 session_id = "khojkar-session-" + str(uuid.uuid4())
 

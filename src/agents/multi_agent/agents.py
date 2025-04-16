@@ -2,14 +2,12 @@ import requests
 
 from agents.commons import Researcher
 from agents.multi_agent.models import (
-    Comparison,
     Questions,
     Reflection,
     Retrievals,
     Subtopics,
 )
 from agents.multi_agent.prompts import (
-    COMPARISON_PROMPT,
     PLANNER_PROMPT,
     QUESTION_GENERATOR_PROMPT,
     REFLECTOR_PROMPT,
@@ -107,16 +105,6 @@ class MultiAgentResearcher(Researcher):
             max_steps=30,
         )
 
-        comparison_agent = ReActAgent(
-            name="comparison",
-            description="Agent that compares the information from the web to answer questions.",
-            model=self.model,
-            tool_registry=tool_registry,
-            prompt=COMPARISON_PROMPT,
-            output_format=Comparison,
-            max_steps=30,
-        )
-
         reflection_agent = ReActAgent(
             name="reflection",
             description="Agent that reflects on the information from the web to answer questions.",
@@ -137,14 +125,13 @@ class MultiAgentResearcher(Researcher):
         )
 
         supervisor_agent = SupervisorAgent(
-            name="storm_supervisor",
+            name="storm",
             description="Supervisor agent for the STORM research workflow",
             model=self.model,
             children=[
                 planner_agent,
                 question_generator_agent,
                 retriever_agent,
-                comparison_agent,
                 reflection_agent,
                 synthesis_agent,
             ],
@@ -152,4 +139,6 @@ class MultiAgentResearcher(Researcher):
             max_steps=50,
         )
 
-        return await supervisor_agent.run()
+        response = await supervisor_agent.run()
+
+        return response.content

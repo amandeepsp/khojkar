@@ -1,5 +1,6 @@
 import logging
 import uuid
+from typing import Optional
 
 import chromadb
 from chromadb.utils import embedding_functions
@@ -37,20 +38,25 @@ class VectorStoreMemory(Memory):
             f"Accessed or created ChromaDB collection: '{self.collection_name}'"
         )
 
-    async def add(self, text: str, metadata: dict):
+    async def add(self, text: str, metadata: dict) -> Optional[str]:
         """
-        Adds a text snippet and its metadata to the ChromaDB collection.
+        Adds a text snippet and its metadata to the ChromaDB collection. Returns the ID of the added document.
 
         Args:
             text: The text content to store.
             metadata: A dictionary containing metadata (e.g., source_url, title).
+
+        Returns:
+            The ID of the added document.
         """
         if not text:
             logger.warning("Attempted to add empty text to memory. Skipping.")
-            return
+            return None
 
         document_id = str(uuid.uuid4())
         self.collection.add(documents=[text], metadatas=[metadata], ids=[document_id])
+
+        return document_id
 
     async def query(self, query_text: str, top_k: int = 5) -> list[dict]:
         """

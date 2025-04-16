@@ -6,8 +6,8 @@ import sys
 import click
 from diskcache import Cache
 
-from agents.multi_agent.agents import MultiAgentResearcher
 import utils
+from agents.multi_agent.agents import MultiAgentResearcher
 from agents.naive.deep_research import SingleAgentResearcher
 
 logger = logging.getLogger(__name__)
