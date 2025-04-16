@@ -16,3 +16,10 @@ def extract_lang_block(
         raise ValueError(f"No {language} block found in text")
 
     return text.strip()
+
+
+def remove_thinking_output(text: str) -> str:
+    """Remove the thinking output from the text
+    e.g. <think> </think>
+    """
+    return re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)

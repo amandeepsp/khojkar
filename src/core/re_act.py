@@ -3,7 +3,6 @@ import json
 import logging
 from typing import Any
 
-from langfuse.decorators import observe
 from pydantic import BaseModel
 
 import llm
@@ -105,17 +104,20 @@ class ReActAgent(Agent):
             messages=self.messages.get_all(),
             tool_choice="auto",
             temperature=self.default_temperature,
-            output_format=self.output_format.model_json_schema(),
+            response_format=self.output_format.model_json_schema(),
+        )
+
+        sanitized_response = utils.remove_thinking_output(
+            response.choices[0].message.content  # type: ignore
         )
 
         return self.output_format.model_validate_json(
             utils.extract_lang_block(
-                response.choices[0].message.content,  # type: ignore
+                sanitized_response,  # type: ignore
                 language="json",
             )
         )
 
-    @observe(name="re_act.run")
     async def run(self, **kwargs) -> Any:
         self.messages.clear()
 
@@ -139,16 +141,26 @@ class ReActAgent(Agent):
 
             logger.info(f"Thinking...\n\n{response.choices[0].message.content}")  # type: ignore
 
-            self.messages.add(response.choices[0].message)  # type: ignore
+            sanitized_response = utils.remove_thinking_output(
+                response.choices[0].message.content  # type: ignore
+            )
+
+            self.messages.add({
+                "role": "assistant",
+                "content": sanitized_response,
+                "tool_calls": response.choices[0].message.tool_calls,  # type: ignore
+            })
 
             tool_calls = response.choices[0].message.tool_calls  # type: ignore
 
             if not tool_calls:
                 logger.info("No further actions needed, finalizing results")
                 if self.output_format:
-                    return self._prompt_model_to_format_response()
+                    return await self._prompt_model_to_format_response()
 
                 return response.choices[0].message  # type: ignore
+
+            logger.info(f"Processing {len(tool_calls)} tool call(s)")
 
             await asyncio.gather(*self._throttle_tool_calls(tool_calls))
 
