@@ -19,6 +19,7 @@ dependencies = [
     "chromadb>=1.0.4",
     "sentence-transformers>=4.0.2",
     "aiolimiter>=1.2.1",
+    "rich>=14.0.0",
 ]
 
 [dependency-groups]

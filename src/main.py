@@ -4,20 +4,24 @@ import logging
 import sys
 
 import click
-from diskcache import Cache
+from rich.logging import RichHandler
 
 import utils
 from agents.multi_agent.agents import MultiAgentResearcher
 from agents.naive.deep_research import SingleAgentResearcher
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
 
-# --- Caching Setup ---
-CACHE_DIR = ".cache/tool_cache"
-tool_cache = Cache(CACHE_DIR)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(message)s",
+    handlers=[
+        RichHandler(
+            level=logging.INFO,
+            omit_repeated_times=False,
+        )
+    ],
+)
 
 
 @click.group()
@@ -56,7 +60,13 @@ def research(topic: str, model: str, output: str, max_steps: int, multi_agent: b
     try:
         # Run the async research function
         report_content = asyncio.run(researcher.research(topic))
+        if report_content is None:
+            raise ValueError("No report content returned from the research")
+
+        # Extract the markdown report from the report content
         markdown_report = utils.extract_lang_block(report_content, "markdown")
+        if markdown_report is None:
+            raise ValueError("No markdown report returned from the research")
 
         with open(output, "w") as f:
             f.write(markdown_report)

@@ -1,8 +1,17 @@
 import inspect
 import logging
-from typing import Any, Callable, Protocol, runtime_checkable
+from typing import (
+    Any,
+    Callable,
+    Protocol,
+    Tuple,
+    Unpack,
+    get_type_hints,
+    runtime_checkable,
+)
 
 import docstring_parser
+from pydantic import ConfigDict, Field, create_model
 
 logger = logging.getLogger(__name__)
 
@@ -43,13 +52,20 @@ class FunctionTool:
         self.description = description
         self.schema = self._generate_schema()
 
+    def _remove_additional_properties(self, schema: dict | list) -> None:
+        if isinstance(schema, dict):
+            schema.pop("additionalProperties", None)
+            for value in schema.values():
+                self._remove_additional_properties(value)
+        elif isinstance(schema, list):
+            for item in schema:
+                self._remove_additional_properties(item)
+
     def _generate_schema(self) -> dict:
         """
         Converts a Python function into a JSON-serializable dictionary
         that describes the function's signature, including its name,
         description, and parameters.
-
-        Taken from https://github.com/openai/swarm/
 
         Args:
             func: The function to be converted.
@@ -57,17 +73,12 @@ class FunctionTool:
         Returns:
             A dictionary representing the function's signature in JSON format.
         """
-        type_map = {
-            str: "string",
-            int: "integer",
-            float: "number",
-            bool: "boolean",
-            list: "array",
-            dict: "object",
-        }
 
         doc = inspect.getdoc(self.func)
         parsed_docstring = docstring_parser.parse(doc or "")
+        docstring_params = parsed_docstring.params
+        docstring_description = parsed_docstring.short_description
+        type_hints = get_type_hints(self.func)
 
         try:
             signature = inspect.signature(self.func)
@@ -76,60 +87,38 @@ class FunctionTool:
                 f"Failed to get signature for function {self.func.__name__}: {str(e)}"
             )
 
-        parameters_descriptions = parsed_docstring.params
         parameters = {}
         for param in signature.parameters.values():
-            if param.name == "kwargs":
-                parameters["kwargs"] = {
-                    "type": "object",
-                    "description": "Additional arguments to pass to the function, should be a json serialezable object",
-                }
-                continue
-
-            try:
-                param_type = type_map.get(param.annotation)
-            except KeyError as e:
-                raise KeyError(
-                    f"Unknown type annotation {param.annotation} for parameter {param.name}: {str(e)}"
-                )
+            annotation = type_hints.get(param.name, param.annotation)
 
             parameter_description = ""
             try:
                 parameter_description = next(
-                    p.description
-                    for p in parameters_descriptions
-                    if p.arg_name == param.name
+                    p.description for p in docstring_params if p.arg_name == param.name
                 )
             except StopIteration:
                 logger.warning(
                     f"Missing docstring description for parameter {param.name} in tool {self.name}"
                 )
 
-            parameters[param.name] = {
-                "type": param_type,
-                "description": parameter_description,
-            }
+            parameters[param.name] = (
+                annotation,
+                Field(description=parameter_description),
+            )
 
-        required = [
-            param.name
-            for param in signature.parameters.values()
-            if param.default == inspect._empty
-        ]
-
-        docstring_description = parsed_docstring.short_description
-
-        final_description = self.description or docstring_description or ""
+        params_model = create_model(
+            f"{self.name}_args", **parameters, __config__=ConfigDict(extra="forbid")
+        )
+        params_schema = params_model.model_json_schema()
+        self._remove_additional_properties(params_schema)
+        description = self.description or docstring_description or ""
 
         return {
             "type": "function",
             "function": {
                 "name": self.name,
-                "description": final_description,
-                "parameters": {
-                    "type": "object",
-                    "properties": parameters,
-                    "required": required,
-                },
+                "description": description,
+                "parameters": params_schema,
             },
         }
 
@@ -146,8 +135,10 @@ class FunctionTool:
 
 
 class ToolRegistry:
-    def __init__(self) -> None:
+    def __init__(self, *args: Unpack[Tuple[Tool, ...]]) -> None:
         self.tools: dict[str, Tool] = {}
+        for tool in args:
+            self.register(tool)
 
     def register(self, tool: Tool) -> None:
         self.tools[tool.name] = tool
@@ -165,3 +156,6 @@ class ToolRegistry:
 
     def __getitem__(self, key: str) -> Tool:
         return self.tools[key]
+
+    def with_tools(self, *tools: Tool) -> "ToolRegistry":
+        return ToolRegistry(*list(self.tools.values()) + list(tools))

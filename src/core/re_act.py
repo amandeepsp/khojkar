@@ -4,6 +4,8 @@ import logging
 from typing import Any, Optional, Type
 
 from pydantic import BaseModel
+from rich.console import Console
+from rich.markdown import Markdown
 
 import llm
 import utils
@@ -12,6 +14,8 @@ from core.tool import ToolRegistry
 from memory.context import MessagesMemory
 
 logger = logging.getLogger(__name__)
+
+console = Console()
 
 
 class AgentLoggerAdapter(logging.LoggerAdapter):
@@ -32,7 +36,8 @@ class ReActAgent(Agent):
         max_steps: int = 10,
         default_temperature: float = 0.3,
         max_concurrent_tool_calls: int = 3,
-        output_format: Optional[Type[BaseModel]] = None,
+        input_schema: Optional[Type[BaseModel]] = None,
+        output_schema: Optional[Type[BaseModel]] = None,
     ):
         self.name = name
         self.description = description
@@ -44,8 +49,8 @@ class ReActAgent(Agent):
         self.current_step = 0
         self.default_temperature = default_temperature
         self.max_concurrent_tool_calls = max_concurrent_tool_calls
-        self.output_format = output_format
-        self.logger = AgentLoggerAdapter(logger, {"agent_name": self.name})
+        self.output_schema = output_schema
+        self.input_schema = input_schema
 
     def _safe_json_serialize(self, obj: Any) -> str:
         """Tool calls can return non-serializable objects, so we need to serialize them to a string"""
@@ -70,19 +75,20 @@ class ReActAgent(Agent):
         tool_args = json.loads(tool_call.function.arguments)
         tool_call_id = tool_call.id
 
-        self.logger.info(f"Using tool: {tool_call.function.name}, args: {tool_args}")
+        logger.info(f"Using tool: {tool_call.function.name}, args: {tool_args}")
         tool_call_result = None
         try:
             tool_call_result = await tool(**tool_args)
             tool_call_result = self._safe_json_serialize(tool_call_result)
+            logger.info(f"Tool call {tool_call.function.name} succeeded.")
         except Exception as e:
-            self.logger.warning(
+            logger.warning(
                 f"Tool call {tool_call.function.name} failed, args: {tool_args}, error: {e}"
             )
             tool_call_result = f"Tool call {tool_call.function.name} failed, please try some other tool"
 
         if not tool_call_result:
-            self.logger.warning(
+            logger.warning(
                 f"Tool call {tool_call.function.name} failed, args: {tool_args}"
             )
             tool_call_result = f"Tool call {tool_call.function.name} failed, please try some other tool"
@@ -92,7 +98,7 @@ class ReActAgent(Agent):
                 tool_call_result[: tool.max_result_length]
                 + "\n\n[Content truncated due to length...]"
             )
-            self.logger.info("Tool call result truncated due to length.")
+            logger.info("Tool call result truncated due to length.")
 
         self.messages.add({
             "role": "tool",
@@ -101,11 +107,11 @@ class ReActAgent(Agent):
         })
 
     async def _prompt_model_to_format_response(self) -> Any:
-        assert self.output_format is not None
+        assert self.output_schema is not None
         self.messages.add({
             "role": "user",
             "content": "Please format the response as JSON according to the following JSON Schema: \n"
-            + json.dumps(self.output_format.model_json_schema()),
+            + json.dumps(self.output_schema.model_json_schema()),
         })
 
         response = await llm.acompletion(
@@ -113,14 +119,14 @@ class ReActAgent(Agent):
             messages=self.messages.get_all(),
             tool_choice="auto",
             temperature=self.default_temperature,
-            response_format=self.output_format.model_json_schema(),
+            response_format=self.output_schema.model_json_schema(),
         )
 
         sanitized_response = utils.remove_thinking_output(
             response.choices[0].message.content  # type: ignore
         )
 
-        return self.output_format.model_validate_json(
+        return self.output_schema.model_validate_json(
             utils.extract_lang_block(
                 sanitized_response,  # type: ignore
                 language="json",
@@ -130,15 +136,15 @@ class ReActAgent(Agent):
     async def run(self, **kwargs) -> Any:
         self.messages.clear()
 
-        if "extra_prompt" in kwargs:
+        if kwargs:
             self.messages.add({
                 "role": "user",
-                "content": kwargs["extra_prompt"],
+                "content": self._safe_json_serialize(kwargs),
             })
 
         for _ in range(self.max_steps):
             self.current_step += 1
-            self.logger.info(f"Running ReACT agent with {len(self.messages)} messages")
+            logger.info(f"Running ReACT agent with {len(self.messages)} messages")
 
             response = await llm.acompletion(
                 model=self.model,
@@ -148,7 +154,11 @@ class ReActAgent(Agent):
                 temperature=self.default_temperature,
             )
 
-            self.logger.info(f"Thinking...\n\n{response.choices[0].message.content}")  # type: ignore
+            if response.choices[0].message.content:  # type: ignore
+                console.print()
+                console.print("Thinking...")
+                console.print(Markdown(response.choices[0].message.content))  # type: ignore
+                console.print()
 
             sanitized_response = utils.remove_thinking_output(
                 response.choices[0].message.content  # type: ignore
@@ -161,18 +171,26 @@ class ReActAgent(Agent):
             })
 
             tool_calls = response.choices[0].message.tool_calls  # type: ignore
+            finish_reason = response.choices[0].finish_reason  # type: ignore
 
             if not tool_calls:
-                self.logger.info("No further actions needed, finalizing results")
-                if self.output_format:
+                if finish_reason != "stop":
+                    logger.error(f"Agent failed to stop, stop reason - {finish_reason}")
+                    raise StopIteration(
+                        f"Agent failed to stop, stop reason - {finish_reason}"
+                    )
+
+                logger.info("No further actions needed, finalizing results")
+
+                if self.output_schema:
                     return await self._prompt_model_to_format_response()
 
                 return response.choices[0].message  # type: ignore
 
-            self.logger.info(f"Processing {len(tool_calls)} tool call(s)")
+            logger.info(f"Processing {len(tool_calls)} tool call(s)")
 
             await asyncio.gather(*self._throttle_tool_calls(tool_calls))
 
         # If we reach max_steps without the LLM deciding to stop, return the last response
-        self.logger.error("Reached maximum number of steps, still tool calls remaining")
+        logger.error("Reached maximum number of steps, still tool calls remaining")
         raise StopIteration("Reached maximum number of steps")

@@ -27,4 +27,6 @@ mlruns/
 .cache/
 src/_scratch.py
 
+.playwright/
+
 *.mp3

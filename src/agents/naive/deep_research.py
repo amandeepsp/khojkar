@@ -82,8 +82,6 @@ class SingleAgentResearcher(Researcher):
         self.model = model
 
     async def research(self, topic: str) -> str:
-        tool_registry = ToolRegistry()
-
         tool_cache = Cache(".cache/tool_cache")
 
         google_search = GoogleProgrammableSearchEngine(num_results=10)
@@ -128,9 +126,11 @@ class SingleAgentResearcher(Researcher):
             cache=tool_cache,
         )
 
-        tool_registry.register(google_search_tool)
-        tool_registry.register(web_scrape_tool)
-        tool_registry.register(arxiv_search_tool)
+        tool_registry = ToolRegistry(
+            google_search_tool,
+            arxiv_search_tool,
+            web_scrape_tool,
+        )
 
         tool_descriptions = tool_registry._tool_descriptions()
         current_date_str = datetime.now(timezone.utc).strftime("%B %d, %Y")
