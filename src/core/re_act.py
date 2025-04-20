@@ -18,13 +18,6 @@ logger = logging.getLogger(__name__)
 console = Console()
 
 
-class AgentLoggerAdapter(logging.LoggerAdapter):
-    def process(self, msg, kwargs):
-        if self.extra is None or self.extra["agent_name"] is None:
-            return msg, kwargs
-        return f"[agent: {self.extra['agent_name']}] {msg}", kwargs
-
-
 class ReActAgent(Agent):
     def __init__(
         self,
@@ -45,12 +38,13 @@ class ReActAgent(Agent):
         self.tool_registry = tool_registry
         self.max_steps = max_steps
         self.prompt = prompt
-        self.messages = MessagesMemory(system_prompt=prompt, max_tokens=1_000_000_000)
+        self.messages = MessagesMemory(max_tokens=1_000_000_000)
         self.current_step = 0
         self.default_temperature = default_temperature
         self.max_concurrent_tool_calls = max_concurrent_tool_calls
         self.output_schema = output_schema
         self.input_schema = input_schema
+        self.run_lock = asyncio.Lock()
 
     def _safe_json_serialize(self, obj: Any) -> str:
         """Tool calls can return non-serializable objects, so we need to serialize them to a string"""
@@ -83,15 +77,15 @@ class ReActAgent(Agent):
             logger.info(f"Tool call {tool_call.function.name} succeeded.")
         except Exception as e:
             logger.warning(
-                f"Tool call {tool_call.function.name} failed, args: {tool_args}, error: {e}"
+                f"Tool call {tool_call.function.name} failed, args: {tool_args}, error: {repr(e)}"
             )
-            tool_call_result = f"Tool call {tool_call.function.name} failed, please try some other tool"
+            tool_call_result = f"Tool call {tool_call.function.name} failed, please retry or use a different tool; error: {repr(e)}"
 
         if not tool_call_result:
             logger.warning(
-                f"Tool call {tool_call.function.name} failed, args: {tool_args}"
+                f"Tool call {tool_call.function.name} returned empty result, args: {tool_args}"
             )
-            tool_call_result = f"Tool call {tool_call.function.name} failed, please try some other tool"
+            tool_call_result = "Tool call returned empty result, assume it succeeded"
 
         if tool.max_result_length and len(tool_call_result) > tool.max_result_length:
             tool_call_result = (
@@ -122,75 +116,64 @@ class ReActAgent(Agent):
             response_format=self.output_schema.model_json_schema(),
         )
 
-        sanitized_response = utils.remove_thinking_output(
-            response.choices[0].message.content  # type: ignore
-        )
-
         return self.output_schema.model_validate_json(
             utils.extract_lang_block(
-                sanitized_response,  # type: ignore
+                response.choices[0].message.content,  # type: ignore
                 language="json",
             )
         )
 
     async def run(self, **kwargs) -> Any:
-        self.messages.clear()
+        async with self.run_lock:
+            self.messages.clear()
+            if not kwargs:
+                self.messages.add_system_prompt(self.prompt)
+            else:
+                self.messages.add_formatted_system_prompt(self.prompt, **kwargs)
 
-        if kwargs:
-            self.messages.add({
-                "role": "user",
-                "content": self._safe_json_serialize(kwargs),
-            })
+            for _ in range(self.max_steps):
+                self.current_step += 1
+                logger.info(f"Running ReACT agent with {len(self.messages)} messages")
 
-        for _ in range(self.max_steps):
-            self.current_step += 1
-            logger.info(f"Running ReACT agent with {len(self.messages)} messages")
+                response = await llm.acompletion(
+                    model=self.model,
+                    messages=self.messages.get_all(),
+                    tools=self.tool_registry.tool_schemas(),
+                    tool_choice="auto",
+                    temperature=self.default_temperature,
+                )
 
-            response = await llm.acompletion(
-                model=self.model,
-                messages=self.messages.get_all(),
-                tools=self.tool_registry.tool_schemas(),
-                tool_choice="auto",
-                temperature=self.default_temperature,
-            )
+                if response.choices[0].message.content:  # type: ignore
+                    console.print()
+                    console.print("Thinking...")
+                    console.print(Markdown(response.choices[0].message.content))  # type: ignore
+                    console.print()
 
-            if response.choices[0].message.content:  # type: ignore
-                console.print()
-                console.print("Thinking...")
-                console.print(Markdown(response.choices[0].message.content))  # type: ignore
-                console.print()
+                self.messages.add(response.choices[0].message)  # type: ignore
 
-            sanitized_response = utils.remove_thinking_output(
-                response.choices[0].message.content  # type: ignore
-            )
+                tool_calls = response.choices[0].message.tool_calls  # type: ignore
+                finish_reason = response.choices[0].finish_reason  # type: ignore
 
-            self.messages.add({
-                "role": "assistant",
-                "content": sanitized_response,
-                "tool_calls": response.choices[0].message.tool_calls,  # type: ignore
-            })
+                if not tool_calls:
+                    if finish_reason != "stop":
+                        logger.error(
+                            f"Agent failed to stop, stop reason - {finish_reason}"
+                        )
+                        raise StopIteration(
+                            f"Agent failed to stop, stop reason - {finish_reason}"
+                        )
 
-            tool_calls = response.choices[0].message.tool_calls  # type: ignore
-            finish_reason = response.choices[0].finish_reason  # type: ignore
+                    logger.info("No further actions needed, finalizing results")
 
-            if not tool_calls:
-                if finish_reason != "stop":
-                    logger.error(f"Agent failed to stop, stop reason - {finish_reason}")
-                    raise StopIteration(
-                        f"Agent failed to stop, stop reason - {finish_reason}"
-                    )
+                    if self.output_schema:
+                        return await self._prompt_model_to_format_response()
 
-                logger.info("No further actions needed, finalizing results")
+                    return response.choices[0].message  # type: ignore
 
-                if self.output_schema:
-                    return await self._prompt_model_to_format_response()
+                logger.info(f"Processing {len(tool_calls)} tool call(s)")
 
-                return response.choices[0].message  # type: ignore
+                await asyncio.gather(*self._throttle_tool_calls(tool_calls))
 
-            logger.info(f"Processing {len(tool_calls)} tool call(s)")
-
-            await asyncio.gather(*self._throttle_tool_calls(tool_calls))
-
-        # If we reach max_steps without the LLM deciding to stop, return the last response
-        logger.error("Reached maximum number of steps, still tool calls remaining")
-        raise StopIteration("Reached maximum number of steps")
+            # If we reach max_steps without the LLM deciding to stop, return the last response
+            logger.error("Reached maximum number of steps, still tool calls remaining")
+            raise StopIteration("Reached maximum number of steps")

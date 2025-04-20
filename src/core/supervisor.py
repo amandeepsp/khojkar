@@ -43,7 +43,8 @@ class SupervisorAgent(Agent):
             max_steps=max_steps,
         )
 
-        # Create a registry of available agents by name
+        # TODO: Create an agent factory so that we can have multiple agents running concurrently
+        #       Currently, you can handoff again and again to the same agent
         self.agent_registry = {agent.name: agent for agent in children}
 
         # Handoff tool - updated description and signature expectation
@@ -93,7 +94,6 @@ class SupervisorAgent(Agent):
         -------
         """
 
-    # Updated signature to match the FunctionTool's expected parameters
     async def _route_to_agent(self, agent_name: str, agent_input: dict = {}):
         """
         Route the task to a specific agent, validating input if schema is defined.

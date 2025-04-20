@@ -9,11 +9,23 @@ class MessagesMemory:
     Truncates in a FIFO manner.
     """
 
-    def __init__(self, system_prompt: str, max_tokens: int):
-        self.system_prompt = system_prompt
+    def __init__(self, max_tokens: int):
+        self.system_prompt = None
         self.max_tokens = max_tokens
+        self.messages = []
+        self.total_tokens = 0
+
+    def add_system_prompt(self, system_prompt):
+        self.system_prompt = system_prompt
         self.messages = [{"role": "user", "content": system_prompt}]
         self.total_tokens = self._num_tokens_from_string(system_prompt)
+
+    def add_formatted_system_prompt(self, system_prompt, **kwargs):
+        _flattened_kwargs = {k: str(v) for k, v in kwargs.items() if v is not None}
+        _formatted_system_prompt = system_prompt.format(**_flattened_kwargs)
+        self.system_prompt = _formatted_system_prompt
+        self.messages = [{"role": "user", "content": _formatted_system_prompt}]
+        self.total_tokens = self._num_tokens_from_string(_formatted_system_prompt)
 
     def _num_tokens_from_string(self, string: str | None) -> int:
         """Estimate the number of tokens in a string."""
@@ -38,8 +50,8 @@ class MessagesMemory:
         return self.messages
 
     def clear(self):
-        self.messages = [{"role": "user", "content": self.system_prompt}]
-        self.total_tokens = self._num_tokens_from_string(self.system_prompt)
+        self.messages = []
+        self.total_tokens = 0
 
     def __len__(self):
         return len(self.messages)

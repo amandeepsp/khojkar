@@ -23,10 +23,8 @@ notebooks/
 !README.md
 
 mlruns/
-
 .cache/
-src/_scratch.py
-
 .playwright/
+.memory/
 
 *.mp3

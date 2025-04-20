@@ -9,7 +9,7 @@ from .tool import FunctionTool
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_CACHE_TTL: int = int(datetime.timedelta(days=1).total_seconds())
+DEFAULT_CACHE_TTL: int = int(datetime.timedelta(days=5).total_seconds())
 
 
 class CachedTool:

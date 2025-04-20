@@ -17,11 +17,14 @@ class VectorStoreMemory(Memory):
     """
 
     def __init__(
-        self, collection_name: str, embedding_model_name: str = "all-MiniLM-L6-v2"
+        self,
+        db_path: str,
+        collection_name: str,
+        embedding_model_name: str = "all-MiniLM-L6-v2",
+        clear_on_init: bool = False,
     ):
         self.collection_name = collection_name
-        # TODO: Implement persisted client
-        self.client = chromadb.Client()
+        self.client = chromadb.PersistentClient(path=db_path)
         self.embedding_function = (
             embedding_functions.SentenceTransformerEmbeddingFunction(
                 model_name=embedding_model_name
@@ -58,13 +61,12 @@ class VectorStoreMemory(Memory):
 
         return document_id
 
-    async def query(self, query_text: str, top_k: int = 5) -> list[dict]:
+    async def query(self, query_text: str) -> list[dict]:
         """
         Queries the collection for text snippets semantically similar to the query_text.
 
         Args:
             query_text: The text to query the collection with.
-            top_k: The number of results to return.
 
         Returns:
             A list of dictionaries containing the text and metadata of the results.
@@ -74,9 +76,7 @@ class VectorStoreMemory(Memory):
             return []
 
         results: chromadb.QueryResult = self.collection.query(
-            query_texts=[query_text],
-            n_results=top_k,
-            include=["documents", "metadatas"],
+            query_texts=[query_text], include=["documents", "metadatas"], n_results=5
         )
 
         docs = results["documents"]
@@ -86,12 +86,51 @@ class VectorStoreMemory(Memory):
             logger.warning("No results found in ChromaDB. Returning empty list.")
             return []
 
+        result = []
+        for docs, metas in zip(docs, metadatas):
+            for doc, meta in zip(docs, metas):
+                result.append({
+                    "document": doc,
+                    "metadata": meta,
+                })
+
+        logger.info(f"Found {len(result)} results in ChromaDB.")
+        logger.info(result)
+
+        return result
+
+    async def get_all_documents(self) -> list[dict]:
+        """
+        Retrieves all documents from the ChromaDB collection.
+
+        Returns:
+            A list of dictionaries containing the text and metadata of all documents.
+        """
+
+        documents = []
+        metadatas = []
+        count = self.collection.count()
+        batch_size = 10
+        for i in range(0, count, batch_size):
+            batch = self.collection.get(
+                include=["documents", "metadatas"],
+                limit=batch_size,
+                offset=i,
+            )
+            if batch["documents"] is not None:
+                documents.extend(batch["documents"])
+            if batch["metadatas"] is not None:
+                metadatas.extend(batch["metadatas"])
+
         return [
-            {"document": document, "metadata": metadata}
-            for document, metadata in zip(docs, metadatas)
+            {
+                "document": doc,
+                "metadata": meta,
+            }
+            for doc, meta in zip(documents, metadatas)
         ]
 
-    async def clear(self):
+    def clear(self):
         """Deletes the collection. Use with caution!"""
         self.client.delete_collection(name=self.collection_name)
         logger.info(f"Collection '{self.collection_name}' deleted.")

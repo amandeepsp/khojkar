@@ -13,6 +13,7 @@ class Scratchpad:
         self.lock = asyncio.Lock()
 
     def _format(self) -> str:
+        console.print_json(json.dumps(self.scratchpad))
         return json.dumps(self.scratchpad)
 
     async def add_todos(self, todos: list[str]):
@@ -26,6 +27,7 @@ class Scratchpad:
                 self.scratchpad["todos"] = dict()
             for todo in todos:
                 self.scratchpad["todos"][todo] = False
+            return self._format()
 
     async def mark_todos_as_done(self, todos: list[str]):
         """Mark todos as done.
@@ -42,34 +44,4 @@ class Scratchpad:
                 else:
                     # Optionally raise an error or log a warning if a todo doesn't exist
                     print(f"Warning: Todo '{todo}' not found in scratchpad.")
-
-    async def add_notes(self, notes: list[dict | str]):
-        """Add notes to the scratchpad.
-
-        Args:
-            notes (list[str]): The notes to add.
-        """
-        async with self.lock:
-            if "notes" not in self.scratchpad:
-                self.scratchpad["notes"] = list()
-            for note in notes:
-                if note:
-                    self.scratchpad["notes"].append(note)
-
-    async def get_notes(self) -> list[dict | str]:
-        """Get the notes from the scratchpad.
-
-        Returns:
-            list[dict | str]: The notes.
-        """
-        async with self.lock:
-            return self.scratchpad["notes"]
-
-    async def get_todos(self) -> dict[str, bool]:
-        """Get the todos from the scratchpad.
-
-        Returns:
-            dict[str, bool]: The todos.
-        """
-        async with self.lock:
-            return self.scratchpad["todos"]
+            return self._format()
