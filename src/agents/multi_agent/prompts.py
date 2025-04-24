@@ -15,7 +15,17 @@ Workflow:
     3. Reflect on Research: Once all subtopics have been processed through step 2, use the Reflector Agent to review all the collected information.
         a. DO NOT add any new todos, or re-search, only reflect on the information, just document the gaps and contradictions.
     4. Synthesize Report: Hand off to the Synthesis Agent to produce the final markdown report, providing it with the collected reflections.
-    5. Output the final report in a single markdown block, no other text or formatting.
+    5. Output the final report in a single markdown block, no other text or formatting, for example:
+    ```markdown
+    # Main Topic
+    ...
+    ## Subtopic 1
+    ...
+    ## Subtopic 2
+    ...
+    ## Subtopic 3
+    ...
+    ```
 
 AFTER EACH STEP and SUB STEP:
     • If the step is complete, mark todo item or multiple todo items as done in the scratchpad.
@@ -50,7 +60,7 @@ Steps:
 2. Run those queries to collect relevant links and references.
 3. Scrape and parse each selected source to extract content.
 4. Identify and extract key insights: quotes, summaries, bullet points, etc.
-5. Save insights into memory with metadata, should be one to two paragraphs long.
+5. Save insights into notes with metadata, insights should be one to two paragraphs long; prefer to add in a markdown format.
 
 Metadata in the following format, for Optional fields, if you cannot find the information, omit the field, do not add null values:
 ```json
@@ -73,48 +83,37 @@ Subtopics:
 
 Do the following:
 1. For each subtopic in the provided list, in order:
-    a. Retrieve the stored research content or snippets for that subtopic from memory.
+    a. Retrieve the stored research for that subtopic from memory and notes
     b. Reflect on:
         • What do we now understand well?
         • What is still unclear or missing?
         • Are there contradictions or gaps?
         • What are some follow up questions that we should explore?
-
-2. Save your reflections in memory with the following metadata:
-    ```json
-    {{
-        "reflection_kind": "<gaps, contradictions, or follow_ups>"
-        "subtopic": "<subtopic>"
-    }}
-    ```
-
-YOU MUST FOLLOW THE WORKFLOW STRICTLY. MUST NOT SKIP ANY STEPS.
+2. Save your reflections in notes.
 """
 
 SYNTHESIS_PROMPT = """
 You are a report generator agent for the topic "{original_topic}".
 
 You are given a list of subtopics, that other agents have researched and reflected on.
-You can get all research snippets from memory or query memory for a specific subtopic, using the tools available to you.
-You can get all reflections from memory, using the tools available to you.
-
 Subtopics:
 {{subtopics}}
 
 Workflow to follow:
 
 1. For each subtopic in the provided list, in order:
-   a. Retrieve the stored research content or snippets for that subtopic from memory.
-   b. Retrieve the stored reflections for that subtopic from memory.
+   a. Retrieve the stored research content on each subtopic from memory.
+   b. Retrieve the stored notes.
    c. Review the retrieved content alongside its reflection.
-   d. References can be found the the metadata of the research snippets.
-   e. Write a clear, concise summary of the key insights, noting any remaining gaps or contradictions.
+   d. Write a clear, concise summary of the key insights, noting any remaining gaps or contradictions.
 
 2. After summarizing all subtopics, assemble the final markdown report:
-   a. Begin with a summary of the main findings.
-   b. Create one section per subtopic using H2 headings, containing your summaries.
-   c. Conclude with a Conclusion section that synthesizes overall themes and recommendations.
-   d. Include inline citations ([^1], [^2], etc.) and a References section in APA format.
+   a. Report should be 1000-2000 words.
+   b. Begin with a summary of the main findings.
+   c. Create one section per subtopic using H2 headings, containing your summaries.
+   d. Conclude with a Conclusion section that synthesizes overall themes and recommendations.
+   e. Include inline citations ([^1], [^2], etc.) and a References section in APA format. DO NOT refer reflections as sources.
+      References should be double spaced
 
 3. Output the final report in markdown format.
 """

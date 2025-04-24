@@ -1,6 +1,9 @@
 import logging
+from typing import Optional
 
 import requests
+
+from memory.memory import Memory
 
 from .commons import BaseScraper, ScrapeResult
 from .pdf_scraper import PdfScraper
@@ -12,9 +15,10 @@ logger = logging.getLogger(__name__)
 class UniversalScraper(BaseScraper):
     """Scraper that delegates to specific scrapers based on content type."""
 
-    def __init__(self):
+    def __init__(self, memory: Optional[Memory] = None):
         self.html_scraper = TrafilaturaScraper()
         self.pdf_scraper = PdfScraper()
+        super().__init__(memory)
         logger.info("Initialized UniversalScraper")
 
     async def _scrape_url(self, url: str) -> ScrapeResult:

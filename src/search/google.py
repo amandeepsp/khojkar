@@ -12,6 +12,12 @@ from search.models import SearchResult, SearchResults
 logger = logging.getLogger(__name__)
 
 
+class ProgrammableSearchNoResults(Exception):
+    """Exception raised when the Google Programmable Search Engine returns no results."""
+
+    pass
+
+
 class GoogleProgrammableSearchEngine(SearchEngine):
     """Google Programmable Search Engine implementation.
 
@@ -74,7 +80,7 @@ class GoogleProgrammableSearchEngine(SearchEngine):
         if "items" not in response_json:
             error_msg = f"No items found in response for query '{query}', response_code={response.status_code}"
             logger.error(error_msg)
-            raise ValueError(error_msg)
+            raise ProgrammableSearchNoResults(error_msg)
 
         items = response_json["items"]
         logger.debug(f"Received {len(items)} raw search results")

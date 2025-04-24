@@ -29,7 +29,7 @@ from scraping.universal_scraper import UniversalScraper
 from search.arxiv import ArxivSearchEngine
 from search.cse_scraper import GoogleProgrammableScrapingSearchEngine
 from search.fallback import FallbackSearchEngine
-from search.google import GoogleProgrammableSearchEngine
+from search.google import GoogleProgrammableSearchEngine, ProgrammableSearchNoResults
 
 logger = logging.getLogger(__name__)
 
@@ -52,12 +52,12 @@ class MultiAgentResearcher(Researcher):
             search = FallbackSearchEngine(
                 primary_engine=google_search,
                 fallback_engine=google_scraping_search,
-                error_conditions=[requests.HTTPError],
+                error_conditions=[requests.HTTPError, ProgrammableSearchNoResults],
             )
 
             arxiv_search = ArxivSearchEngine(num_results=10)
 
-            scraper = UniversalScraper()
+            scraper = UniversalScraper(memory=vector_store)
 
             scratchpad = Scratchpad()
 
@@ -116,13 +116,22 @@ class MultiAgentResearcher(Researcher):
                 cache=tool_cache,
             )
 
-            web_scrape_tool = CachedTool(
-                FunctionTool(
-                    name="scrape_url",
-                    func=scraper.scrape_url,
-                    description="Use this tool to scrape a specific URL for information. Useful for getting detailed information from a specific website or PDF.",
-                ),
-                cache=tool_cache,
+            web_scrape_tool = FunctionTool(
+                name="scrape_url",
+                func=scraper.scrape_url,
+                description="Use this tool to scrape a specific URL for information. Useful for getting detailed information from a specific website or PDF.",
+            )
+
+            add_note_tool = FunctionTool(
+                name="add_note",
+                func=scratchpad.add_note,
+                description="Use this tool to add a note to the scratchpad, prefer to add in a markdown format",
+            )
+
+            get_notes_tool = FunctionTool(
+                name="get_notes",
+                func=scratchpad.get_notes,
+                description="Use this tool to get the notes from the scratchpad",
             )
 
             tool_registry = ToolRegistry(
@@ -146,7 +155,9 @@ class MultiAgentResearcher(Researcher):
                 name="retriever",
                 description="Agent that generates search queries for a subtopic, retrieves information, and processes the findings.",
                 model=self.model,
-                tool_registry=tool_registry.with_tools(add_vector_store_tool),
+                tool_registry=tool_registry.with_tools(
+                    add_vector_store_tool, add_note_tool
+                ),
                 prompt=RETREIVER_PROMPT,
                 input_schema=RetrievalInput,
                 max_steps=50,
@@ -157,7 +168,7 @@ class MultiAgentResearcher(Researcher):
                 description="Agent that reflects on the information gathered across all subtopics, identifies gaps, and suggests refinements.",
                 model=self.model,
                 tool_registry=tool_registry.with_tools(
-                    query_vector_store_tool, add_vector_store_tool
+                    query_vector_store_tool, get_notes_tool
                 ),
                 prompt=REFLECTOR_PROMPT,
                 input_schema=ReflectionInput,
@@ -169,7 +180,7 @@ class MultiAgentResearcher(Researcher):
                 description="Agent that synthesizes the gathered information into a final markdown report.",
                 model=self.model,
                 tool_registry=ToolRegistry(
-                    query_vector_store_tool, get_all_research_tool
+                    query_vector_store_tool, get_all_research_tool, get_notes_tool
                 ),
                 prompt=SYNTHESIS_PROMPT.format(original_topic=topic),
                 input_schema=SynthesisInput,
