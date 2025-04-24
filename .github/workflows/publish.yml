@@ -29,7 +29,7 @@ jobs:
         run: python -m build
 
       - name: Publish package to PyPI
-        run: uv twine upload --repository pypi dist/*
+        run: twine upload dist/*
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }} # Store your PyPI API token as a GitHub secret

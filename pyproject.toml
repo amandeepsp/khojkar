@@ -1,6 +1,6 @@
 [project]
 name = "khojkar"
-version = "0.2.1"
+version = "0.3.2"
 description = "A tool for conducting deep research on a given topic, using a combination of LLMs, search engines, and other tools."
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
