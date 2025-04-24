@@ -8,34 +8,22 @@ khojkar (pa: ਖੋਜਕਾਰ, ipa: /kʰoːd͡ʒ.kɑːɾ/) is a deep research 
 - Python 3.12
 - [uv](https://github.com/astral-sh/uv) - Fast Python package installer and resolver
 
-### Option 1: Direct Usage with `uv`
+## Quick Start (PyPI)
 
-You can run khojkar directly without cloning the repository using `uvx`:
-
-```bash
-uvx khojkar --from git+https://github.com/amandeepsp/khojkar.git research --topic "Your research topic" --output report.md
-```
-
-To set up credentials when using this method, create a `.env` file in your current directory with your API keys. `uvx` will automatically load environment variables from a `.env` file in the current working directory.
-
-### Option 2: Clone and Install
+The easiest way to run khojkar is directly using `uvx`, which will fetch it from PyPI:
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/khojkar.git
-cd khojkar
-
-# Install using uv
-uv venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-uv pip install -e .
+# Run directly from PyPI using uvx
+uvx khojkar research --topic "Your research topic" --output report.md
 ```
+
+To set up credentials when using this method, create a `.env` file in your current working directory with your API keys. `uvx` will automatically load environment variables from a `.env` file.
 
 ## Setup Credentials
 
 khojkar uses LLMs via the LiteLLM library, which requires API keys for the models you want to use.
 
-1. Create a `.env` file in the root directory (if running via Option 2: Clone and Install) or in your current working directory (if running via Option 1: Direct Usage with `uv`).
+1. Create a `.env` file in your current working directory:
 
    ```bash
    touch .env
