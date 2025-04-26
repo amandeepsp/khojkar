@@ -9,7 +9,7 @@ def extract_lang_block(
         return ""
 
     # Match code blocks with any language identifier and extract just the content
-    pattern = rf"```{language}\n([\s\S]*?)\n```"
+    pattern = rf"```{language}\n([\s\S]*)\n```"
     match = re.search(pattern, text)
 
     if match:

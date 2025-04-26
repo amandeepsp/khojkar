@@ -10,7 +10,7 @@ from rich.markdown import Markdown
 import llm
 import utils
 from core.agent import Agent
-from core.tool import ToolRegistry
+from core.tool import Toolbox
 from memory.context import MessagesMemory
 
 logger = logging.getLogger(__name__)
@@ -25,9 +25,9 @@ class ReActAgent(Agent):
         description: str,
         model: str,
         prompt: str,
-        tool_registry: ToolRegistry,
+        tool_registry: Toolbox,
         max_steps: int = 10,
-        default_temperature: float = 0.3,
+        default_temperature: float = 1.0,
         max_concurrent_tool_calls: int = 3,
         input_schema: Optional[Type[BaseModel]] = None,
         output_schema: Optional[Type[BaseModel]] = None,

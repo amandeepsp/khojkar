@@ -1,10 +1,13 @@
+import asyncio
 import logging
 from abc import ABC, abstractmethod
 from typing import Optional
 
 from pydantic import BaseModel, Field
 
-from src.memory.memory import Memory  # Import Memory protocol
+from chunking.commons import Chunker
+from chunking.recursive import RecursiveChunker
+from memory.memory import Memory
 
 logger = logging.getLogger(__name__)
 
@@ -25,18 +28,33 @@ class ScrapeResult(BaseModel):
 class BaseScraper(ABC):
     """Base class for scrapers"""
 
-    def __init__(self, memory: Optional[Memory] = None):
+    def __init__(
+        self,
+        memory: Optional[Memory] = None,
+        chunker: Optional[Chunker] = None,
+    ):
         """Initializes the scraper with an optional memory object.
 
         Args:
             memory: An optional object conforming to the Memory protocol.
+            chunker: An optional chunker object.
         """
         self.memory = memory
+        self.chunker: Chunker = chunker or RecursiveChunker(
+            chunk_size=1000, chunk_overlap=200
+        )
+        if self.memory is not None and self.chunker is None:
+            raise ValueError("Chunker is required if memory is provided")
 
     @abstractmethod
     async def _scrape_url(self, url: str) -> ScrapeResult:
         """Scrape the website and return the content"""
         pass
+
+    def _document_metadata(self, scrape_result: ScrapeResult) -> dict:
+        metadata_raw = scrape_result.model_dump(exclude={"content"})
+        metadata_filtered = {k: v for k, v in metadata_raw.items() if v is not None}
+        return metadata_filtered
 
     async def scrape_url(self, url: str) -> str:
         """Scrape the website, optionally add to memory, and return the content
@@ -54,14 +72,17 @@ class BaseScraper(ABC):
             scrape_result = await self._scrape_url(url)
             if self.memory is not None:
                 logger.info(f"Adding scraped content from {url} to memory.")
-                metadata_raw = scrape_result.model_dump(exclude={"content"})
-                # Filter out keys with None values
-                metadata_filtered = {
-                    k: v for k, v in metadata_raw.items() if v is not None
-                }
-                await self.memory.add(
-                    text=scrape_result.content, metadata=metadata_filtered
-                )
+                metadata = self._document_metadata(scrape_result)
+                document_chunks = self.chunker.chunk(scrape_result.content)
+
+                await asyncio.gather(*[
+                    self.memory.add(
+                        text=chunk,
+                        metadata=metadata,
+                    )
+                    for chunk in document_chunks
+                ])
+
             return scrape_result.model_dump_json()
         except Exception as e:
             logger.error(f"Error scraping URL: {url}, error: {e}")

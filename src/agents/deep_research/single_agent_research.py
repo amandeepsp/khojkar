@@ -7,10 +7,10 @@ from diskcache import Cache
 
 import llm
 from agents.commons import Researcher
-from agents.naive.prompt import deep_research_prompt
+from agents.deep_research.prompts import DEEP_RESEARCH_PROMPT
 from core.cached_tool import CachedTool
 from core.re_act import ReActAgent
-from core.tool import FunctionTool, ToolRegistry
+from core.tool import FunctionTool, Toolbox
 from scraping.universal_scraper import UniversalScraper
 from search.arxiv import ArxivSearchEngine
 from search.cse_scraper import GoogleProgrammableScrapingSearchEngine
@@ -26,7 +26,7 @@ class DeepResearchAgent:
         name: str,
         model: str,
         prompt: str,
-        tool_registry: ToolRegistry,
+        tool_registry: Toolbox,
         max_steps: int = 10,
     ):
         self.name = name
@@ -126,7 +126,7 @@ class SingleAgentResearcher(Researcher):
             cache=tool_cache,
         )
 
-        tool_registry = ToolRegistry(
+        tool_registry = Toolbox(
             google_search_tool,
             arxiv_search_tool,
             web_scrape_tool,
@@ -135,7 +135,7 @@ class SingleAgentResearcher(Researcher):
         tool_descriptions = tool_registry._tool_descriptions()
         current_date_str = datetime.now(timezone.utc).strftime("%B %d, %Y")
 
-        prompt = deep_research_prompt.format(
+        prompt = DEEP_RESEARCH_PROMPT.format(
             question=topic,
             report_format="apa",
             current_date=current_date_str,

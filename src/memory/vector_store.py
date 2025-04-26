@@ -99,37 +99,6 @@ class VectorStoreMemory(Memory):
 
         return result
 
-    async def get_all_documents(self) -> list[dict]:
-        """
-        Retrieves all documents from the ChromaDB collection.
-
-        Returns:
-            A list of dictionaries containing the text and metadata of all documents.
-        """
-
-        documents = []
-        metadatas = []
-        count = self.collection.count()
-        batch_size = 10
-        for i in range(0, count, batch_size):
-            batch = self.collection.get(
-                include=["documents", "metadatas"],
-                limit=batch_size,
-                offset=i,
-            )
-            if batch["documents"] is not None:
-                documents.extend(batch["documents"])
-            if batch["metadatas"] is not None:
-                metadatas.extend(batch["metadatas"])
-
-        return [
-            {
-                "document": doc,
-                "metadata": meta,
-            }
-            for doc, meta in zip(documents, metadatas)
-        ]
-
     def clear(self):
         """Deletes the collection. Use with caution!"""
         self.client.delete_collection(name=self.collection_name)

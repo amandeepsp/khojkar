@@ -20,15 +20,20 @@ dependencies = [
     "sentence-transformers>=4.0.2",
     "aiolimiter>=1.2.1",
     "rich>=14.0.0",
+    "gitpython>=3.1.44",
+    "jsonref>=1.1.0",
+    "duckduckgo-search>=8.0.1",
+    "tiktoken>=0.9.0",
 ]
 
 [dependency-groups]
 dev = [
     "ipykernel>=6.29.5",
     "jupyter>=1.1.1",
-    "mypy>=1.15.0",
     "notebook>=7.3.3",
     "ruff>=0.11.4",
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.4",
 ]
 
 [build-system]
@@ -36,10 +41,10 @@ requires = ["setuptools>=65", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project.scripts]
-khojkar = "main:cli"
+khojkar = "cli:cli"
 
 [tool.ruff]
-target-version = "py313"
+target-version = "py312"
 line-length = 88
 fix = true
 preview = true
@@ -58,3 +63,12 @@ convention = "google"
 
 [tool.pyright]
 typeCheckingMode = "basic"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["src"]
+asyncio_default_fixture_loop_scope = "function"
+markers = [
+    "asyncio: mark a test as an asyncio test",
+]

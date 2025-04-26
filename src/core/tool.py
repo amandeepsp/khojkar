@@ -11,6 +11,7 @@ from typing import (
 )
 
 import docstring_parser
+import jsonref
 from pydantic import ConfigDict, Field, create_model
 
 logger = logging.getLogger(__name__)
@@ -113,6 +114,8 @@ class FunctionTool:
         self._remove_additional_properties(params_schema)
         description = self.description or docstring_description or ""
 
+        params_schema = jsonref.replace_refs(params_schema)
+
         return {
             "type": "function",
             "function": {
@@ -134,11 +137,21 @@ class FunctionTool:
         return self.func(**kwargs)
 
 
-class ToolRegistry:
+class Toolbox:
     def __init__(self, *args: Unpack[Tuple[Tool, ...]]) -> None:
         self.tools: dict[str, Tool] = {}
         for tool in args:
             self.register(tool)
+
+    @staticmethod
+    def from_tools(*args: Unpack[Tuple[Tool, ...]]) -> "Toolbox":
+        return Toolbox(*args)
+
+    @staticmethod
+    def from_tool_registries(
+        *args: Unpack[Tuple["Toolbox", ...]],
+    ) -> "Toolbox":
+        return Toolbox(*[tool for registry in args for tool in registry.tools.values()])
 
     def register(self, tool: Tool) -> None:
         self.tools[tool.name] = tool
@@ -157,5 +170,5 @@ class ToolRegistry:
     def __getitem__(self, key: str) -> Tool:
         return self.tools[key]
 
-    def with_tools(self, *tools: Tool) -> "ToolRegistry":
-        return ToolRegistry(*list(self.tools.values()) + list(tools))
+    def with_tools(self, *tools: Tool) -> "Toolbox":
+        return Toolbox(*list(self.tools.values()) + list(tools))

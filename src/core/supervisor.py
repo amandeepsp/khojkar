@@ -6,7 +6,7 @@ from pydantic import BaseModel, ValidationError
 
 from core.agent import Agent
 from core.re_act import ReActAgent
-from core.tool import FunctionTool, ToolRegistry
+from core.tool import FunctionTool, Toolbox
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +28,7 @@ class SupervisorAgent(Agent):
         description: str,
         model: str,
         system_prompt: str,
-        tool_registry: ToolRegistry = ToolRegistry(),
+        tool_registry: Toolbox = Toolbox(),
         children: list[Agent] = [],
         max_steps: int = 10,
     ):

@@ -28,3 +28,5 @@ mlruns/
 .memory/
 
 *.mp3
+
+.plan/

@@ -2,7 +2,7 @@ from typing import Any, Optional, Protocol, Type, runtime_checkable
 
 from pydantic import BaseModel
 
-from core.tool import ToolRegistry
+from core.tool import Toolbox
 
 
 @runtime_checkable
@@ -15,7 +15,7 @@ class Agent(Protocol):
     name: str
     description: str
     model: str
-    tool_registry: ToolRegistry = ToolRegistry()
+    tool_registry: Toolbox = Toolbox()
     children: list["Agent"] = []
     parent: Optional["Agent"] = None
     input_schema: Optional[Type[BaseModel]] = None
